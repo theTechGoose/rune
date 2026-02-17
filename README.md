@@ -11,38 +11,15 @@
 ## Syntax
 
 ```
-[REQ] recording.register(GetRecordingDto): IdDto
-    id::create(providerName, externalId): id
-      not-valid-provider
-    provider::pick(providerName): provider
-      not-found
-    [PLY] provider.getRecording(externalId): data
-        [CSE] genie
-        ex:provider.search(externalId): SearchDto
-          not-found timed-out invalid-id
-        ex:provider.download(url): data
-          not-found timed-out
-    [CTR] metadata
-    metadata.toDto(): MetadataDto
-    db:metadata.set(IdDto, MetadataDto): void
-      timed-out network-error
-
-[DTO] GetRecordingDto: providerName, externalId
-    input for retrieving a recording
-
-[TYP] provider: Class
-    an instance of the provider class
+[REQ] user.create(CreateUserDto): UserDto
+    user::validate(email): user
+      invalid-email
+    db:user.save(user): void
+      network-error
+    user.toDto(): UserDto
 ```
 
-| Element | Example | Description |
-|---------|---------|-------------|
-| **Tags** | `[REQ]` `[DTO]` `[TYP]` `[PLY]` `[CSE]` `[CTR]` `[RET]` | Structural anchors |
-| **Nouns** | `recording` `provider` `metadata` | Subjects (before `.` or `::`) |
-| **Verbs** | `register` `create` `pick` | Actions (after `.` or `::`) |
-| **DTOs** | `GetRecordingDto` `IdDto` | Data transfer objects |
-| **Boundaries** | `db:` `ex:` `os:` `fs:` `mq:` `lg:` | External system prefixes |
-| **Faults** | `not-found` `timed-out` `network-error` | Error conditions |
-| **Builtins** | `Class` `string` `number` `void` | Primitive types |
+[Learn the full syntax &rarr;](docs/rules-cheatsheet.md)
 
 ## Quickstart
 
