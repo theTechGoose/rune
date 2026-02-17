@@ -1,0 +1,15 @@
+{
+  "grammars": [
+    {
+      "name": "reqspec",
+      "scope": "source.reqspec",
+      "file-types": ["requirements"],
+      "highlights": "queries/highlights.scm",
+      "path": "."
+    }
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Tree-sitter grammar for requirements specification files"
+  }
+}

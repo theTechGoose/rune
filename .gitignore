@@ -1,0 +1,11 @@
+# Build artifacts
+grammar/node_modules/
+grammar/*.dylib
+grammar/*.so
+grammar/*.wasm
+lsp/target/
+
+# Editor
+.DS_Store
+*.swp
+*.swo

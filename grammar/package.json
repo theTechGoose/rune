@@ -1,0 +1,27 @@
+{
+  "name": "tree-sitter-reqspec",
+  "version": "1.0.0",
+  "description": "Tree-sitter grammar for requirements specification files",
+  "main": "bindings/node",
+  "keywords": ["tree-sitter", "parser", "reqspec"],
+  "files": ["grammar.js", "binding.gyp", "prebuilds/**", "bindings/node/*", "queries/*", "src/**"],
+  "dependencies": {
+    "node-addon-api": "^8.3.0",
+    "node-gyp-build": "^4.8.4"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.24.5"
+  },
+  "scripts": {
+    "build": "tree-sitter generate && node-gyp rebuild",
+    "generate": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.reqspec",
+      "file-types": ["requirements"],
+      "highlights": "queries/highlights.scm"
+    }
+  ]
+}

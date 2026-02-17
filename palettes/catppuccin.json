@@ -1,0 +1,14 @@
+{
+  "name": "Catppuccin Mocha",
+  "description": "Catppuccin Mocha palette for reqspec",
+  "colors": {
+    "tag": "#f9e2af",
+    "noun": "#a6e3a1",
+    "verb": "#cba6f7",
+    "dto": "#89b4fa",
+    "builtin": "#94e2d5",
+    "boundary": "#fab387",
+    "fault": "#f38ba8",
+    "comment": "#6c7086"
+  }
+}

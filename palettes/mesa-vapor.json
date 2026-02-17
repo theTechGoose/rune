@@ -1,0 +1,14 @@
+{
+  "name": "Mesa Vapor",
+  "description": "Earthy, muted colors adjusted for dark backgrounds",
+  "colors": {
+    "tag": "#89babf",
+    "noun": "#8a9e7a",
+    "verb": "#9e8080",
+    "dto": "#8fb86e",
+    "builtin": "#eeeeee",
+    "boundary": "#b38585",
+    "fault": "#c9826a",
+    "comment": "#7a7070"
+  }
+}
