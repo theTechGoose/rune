@@ -21,7 +21,7 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 ```bash
 # macOS:   xcode-select --install
 # Linux:   apt install build-essential (or dnf install gcc)
-# Windows: winget install Microsoft.VisualStudio.2022.BuildTools
+# Windows: use WSL, then follow Linux instructions
 # Rust:    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
