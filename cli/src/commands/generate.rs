@@ -99,6 +99,9 @@ fn generate_all(
     let ext = generator.config().file_extension;
     let test_suffix = generator.config().test_suffix;
 
+    // Collect known type names for import filtering
+    let type_names: Vec<String> = spec.types.iter().map(|t| t.name.clone()).collect();
+
     // Collect polymorphic noun names to exclude from regular pure/impure generation
     let poly_nouns: std::collections::HashSet<_> = spec.polymorphics.iter()
         .map(|p| p.noun.clone())
@@ -114,14 +117,14 @@ fn generate_all(
     fs::create_dir_all(dist_dir.join("integration"))
         .map_err(|e| format!("Failed to create integration directory: {}", e))?;
 
-    // Generate shared utilities (skip if exists)
-    let shared_content = generator.generate_shared();
+    // Generate shared utilities and type aliases (skip if exists)
+    let shared_content = generator.generate_shared(&spec.types);
     let shared_path = dist_dir.join("dto").join(format!("_shared.{}", ext));
     write_if_not_exists_in_project(&shared_path, &shared_content, existing_files)?;
 
     // Generate DTOs (skip if exists)
     for dto in &spec.dtos {
-        let content = generator.generate_dto(dto);
+        let content = generator.generate_dto(dto, &type_names);
         let file_path = dist_dir.join("dto").join(format!("{}.{}", dto.kebab_name, ext));
         write_if_not_exists_in_project(&file_path, &content, existing_files)?;
     }
@@ -135,7 +138,7 @@ fn generate_all(
                 .map_err(|e| format!("Failed to create pure/{} directory: {}", noun.name, e))?;
 
             // Generate class (skip if exists)
-            let class_content = generator.generate_pure_class(noun);
+            let class_content = generator.generate_pure_class(noun, &type_names);
             let class_path = noun_dir.join(format!("{}.{}", noun.name, ext));
             write_if_not_exists_in_project(&class_path, &class_content, existing_files)?;
 
@@ -155,7 +158,7 @@ fn generate_all(
                 .map_err(|e| format!("Failed to create impure/{} directory: {}", noun.name, e))?;
 
             // Generate class (skip if exists)
-            let class_content = generator.generate_impure_class(noun);
+            let class_content = generator.generate_impure_class(noun, &type_names);
             let class_path = noun_dir.join(format!("{}.{}", noun.name, ext));
             write_if_not_exists_in_project(&class_path, &class_content, existing_files)?;
 
@@ -168,19 +171,19 @@ fn generate_all(
 
     // Generate integration code (skip if exists)
     for req in &spec.requirements {
-        // Create integration directory
-        let integration_dir = dist_dir.join("integration").join(format!("{}-{}", req.noun, req.verb));
+        // Create integration directory (verb-noun to match camelCase function name)
+        let integration_dir = dist_dir.join("integration").join(format!("{}-{}", req.verb, req.noun));
         fs::create_dir_all(&integration_dir)
-            .map_err(|e| format!("Failed to create integration/{}-{} directory: {}", req.noun, req.verb, e))?;
+            .map_err(|e| format!("Failed to create integration/{}-{} directory: {}", req.verb, req.noun, e))?;
 
         // Generate integration code (skip if exists)
-        let code_content = generator.generate_integration(req);
-        let code_path = integration_dir.join(format!("{}-{}.{}", req.noun, req.verb, ext));
+        let code_content = generator.generate_integration(req, &type_names);
+        let code_path = integration_dir.join(format!("{}-{}.{}", req.verb, req.noun, ext));
         write_if_not_exists_in_project(&code_path, &code_content, existing_files)?;
 
         // Generate integration tests (skip if exists)
         let test_content = generator.generate_integration_test(req);
-        let test_path = integration_dir.join(format!("{}-{}{}.{}", req.noun, req.verb, test_suffix, ext));
+        let test_path = integration_dir.join(format!("{}-{}{}.{}", req.verb, req.noun, test_suffix, ext));
         write_if_not_exists_in_project(&test_path, &test_content, existing_files)?;
     }
 
@@ -215,7 +218,7 @@ fn generate_all(
         write_if_not_exists_in_project(&mod_path, &mod_content, existing_files)?;
 
         // Generate base class in shared/ (skip if exists)
-        let base_content = generator.generate_poly_base_class(poly);
+        let base_content = generator.generate_poly_base_class(poly, &type_names);
         let base_path = shared_dir.join(format!("mod.{}", ext));
         write_if_not_exists_in_project(&base_path, &base_content, existing_files)?;
 
@@ -236,7 +239,7 @@ fn generate_all(
                 .map_err(|e| format!("Failed to create case directory {}: {}", case.kebab_name, e))?;
 
             // Generate case class (skip if exists)
-            let case_content = generator.generate_poly_case_class(poly, case);
+            let case_content = generator.generate_poly_case_class(poly, case, &type_names);
             let case_path = case_dir.join(format!("mod.{}", ext));
             write_if_not_exists_in_project(&case_path, &case_content, existing_files)?;
 
@@ -271,7 +274,7 @@ mod tests {
     db:metadata.set(id): void
     id.toDto(): IdDto
 
-[TYP] id: Class
+[NON] id
     unique identifier
 [TYP] providerName: string
     provider name
@@ -312,7 +315,7 @@ mod tests {
     id::create(name): id
     id.toDto(): OutputDto
 
-[TYP] id: Class
+[NON] id
     identifier
 [TYP] name: string
     name
@@ -368,7 +371,7 @@ mod tests {
     id::create(name): id
     id.toDto(): OutputDto
 
-[TYP] id: Class
+[NON] id
     identifier
 [TYP] name: string
     name
