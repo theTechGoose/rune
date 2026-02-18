@@ -18,9 +18,10 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 
 ## Install
 
-Requires Rust and a C compiler.
-
 ```bash
+# macOS: xcode-select --install
+# Rust:  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
 curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
 ```
 
