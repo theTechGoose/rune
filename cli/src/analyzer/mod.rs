@@ -59,7 +59,7 @@ mod tests {
     id::create(providerName): id
     db:storage.save(id): void
 
-[TYP] id: Class
+[NON] id
     unique identifier
 [TYP] providerName: string
     provider name

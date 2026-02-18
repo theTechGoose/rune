@@ -60,7 +60,7 @@ pub fn extract_requirements(lines: &[ParsedLine]) -> Vec<ReqInfo> {
                         while k < lines.len() {
                             match &lines[k].kind {
                                 LineKind::Empty => k += 1,
-                                LineKind::Req { .. } | LineKind::TypDef { .. } | LineKind::DtoDef { .. } => {
+                                LineKind::Req { .. } | LineKind::TypDef { .. } | LineKind::DtoDef { .. } | LineKind::NonDef { .. } => {
                                     j = k;
                                     break;
                                 }
@@ -73,7 +73,7 @@ pub fn extract_requirements(lines: &[ParsedLine]) -> Vec<ReqInfo> {
                         if k >= lines.len() {
                             break;
                         }
-                        if matches!(&lines[k].kind, LineKind::Req { .. } | LineKind::TypDef { .. } | LineKind::DtoDef { .. }) {
+                        if matches!(&lines[k].kind, LineKind::Req { .. } | LineKind::TypDef { .. } | LineKind::DtoDef { .. } | LineKind::NonDef { .. }) {
                             break;
                         }
                     }
@@ -182,7 +182,7 @@ pub fn extract_requirements(lines: &[ParsedLine]) -> Vec<ReqInfo> {
                         });
                         j += 1;
                     }
-                    LineKind::Ctr { class_name, .. } => {
+                    LineKind::New { class_name, .. } => {
                         // Flush previous faults
                         if !current_step_faults.is_empty() && !steps.is_empty() {
                             steps.last_mut().unwrap().faults.extend(current_step_faults.clone());
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn extracts_requirement_with_constructor_step() {
         let doc = r#"[REQ] recording.register(GetRecordingDto): IdDto
-    [CTR] metadata
+    [NEW] metadata
     metadata.toDto(): MetadataDto"#;
         let lines = parse_document(doc);
         let reqs = extract_requirements(&lines);

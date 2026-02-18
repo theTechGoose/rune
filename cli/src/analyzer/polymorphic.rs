@@ -104,8 +104,8 @@ fn extract_cases(lines: &[ParsedLine], type_map: &HashMap<String, String>) -> Ve
                 });
                 i += 1;
             }
-            // Stop at next [PLY], [REQ], [DTO], [TYP], or empty line at base indent
-            LineKind::Ply { .. } | LineKind::Req { .. } | LineKind::DtoDef { .. } | LineKind::TypDef { .. } => break,
+            // Stop at next [PLY], [REQ], [DTO], [TYP], [NON], or empty line at base indent
+            LineKind::Ply { .. } | LineKind::Req { .. } | LineKind::DtoDef { .. } | LineKind::TypDef { .. } | LineKind::NonDef { .. } => break,
             LineKind::Empty => {
                 // Check if next non-empty line is a new block
                 i += 1;
@@ -156,7 +156,7 @@ fn extract_case_steps(lines: &[ParsedLine], _type_map: &HashMap<String, String>)
             }
             // Stop at next [CSE], [PLY], [REQ], etc.
             LineKind::Cse { .. } | LineKind::Ply { .. } | LineKind::Req { .. } |
-            LineKind::DtoDef { .. } | LineKind::TypDef { .. } => break,
+            LineKind::DtoDef { .. } | LineKind::TypDef { .. } | LineKind::NonDef { .. } => break,
             LineKind::Fault { .. } => i += 1, // Skip faults, already collected
             LineKind::Empty | LineKind::Comment { .. } => i += 1,
             _ => i += 1,

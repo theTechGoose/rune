@@ -87,14 +87,14 @@ mod tests {
     }
 
     #[test]
-    fn extracts_class_type() {
-        let doc = "[TYP] storage: Class\n    storage system";
+    fn extracts_uint8array_type() {
+        let doc = "[TYP] data: Uint8Array\n    binary data";
         let lines = parse_document(doc);
         let types = extract_types(&lines);
 
         assert_eq!(types.len(), 1);
-        assert_eq!(types[0].name, "storage");
-        assert_eq!(types[0].underlying_type, "Class");
+        assert_eq!(types[0].name, "data");
+        assert_eq!(types[0].underlying_type, "Uint8Array");
     }
 
     #[test]

@@ -17,6 +17,7 @@ pub struct PropertyInfo {
     pub name: String,
     pub type_ref: TypeRef,
     pub is_array: bool,
+    pub optional: bool,
 }
 
 /// Type reference for properties
@@ -45,30 +46,39 @@ pub fn to_kebab_case(s: &str) -> String {
 
 /// Parse property string to extract property info
 fn parse_property(prop: &str) -> PropertyInfo {
+    // Check for optional suffix
+    let (prop_str, optional) = if prop.ends_with('?') {
+        (&prop[..prop.len() - 1], true)
+    } else {
+        (prop, false)
+    };
+
     // Check for array syntax: url(s), address(es), child(ren)
-    if let Some(paren_pos) = prop.find('(') {
-        if prop.ends_with(')') {
-            let base_name = &prop[..paren_pos];
+    if let Some(paren_pos) = prop_str.find('(') {
+        if prop_str.ends_with(')') {
+            let base_name = &prop_str[..paren_pos];
             // Array property - base_name is both the property name base and type reference
             return PropertyInfo {
-                name: prop.to_string(),
+                name: prop_str.to_string(),
                 type_ref: TypeRef::Custom(base_name.to_string()),
                 is_array: true,
+                optional,
             };
         }
     }
 
     // Check if it's a DTO reference (ends with Dto)
-    let type_ref = if prop.ends_with("Dto") {
-        TypeRef::Dto(prop.to_string())
+    let type_ref = if prop_str.ends_with("Dto") {
+        TypeRef::Dto(prop_str.to_string())
     } else {
-        TypeRef::Custom(prop.to_string())
+        TypeRef::Custom(prop_str.to_string())
     };
 
     PropertyInfo {
-        name: prop.to_string(),
+        name: prop_str.to_string(),
         type_ref,
         is_array: false,
+        optional,
     }
 }
 

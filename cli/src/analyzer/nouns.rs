@@ -49,6 +49,15 @@ pub fn extract_nouns_with_types(lines: &[ParsedLine], types: &[TypeInfo]) -> Vec
     let mut noun_methods: HashMap<String, Vec<MethodInfo>> = HashMap::new();
     let mut noun_boundaries: HashMap<String, HashSet<String>> = HashMap::new();
 
+    // Pre-populate nouns declared with [NON] so they appear even without methods
+    let mut i = 0;
+    while i < lines.len() {
+        if let LineKind::NonDef { name } = &lines[i].kind {
+            noun_methods.entry(name.clone()).or_default();
+        }
+        i += 1;
+    }
+
     let mut i = 0;
     while i < lines.len() {
         match &lines[i].kind {

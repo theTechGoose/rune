@@ -43,7 +43,6 @@ pub fn string_to_type_ref_with_resolution(s: &str, type_map: &HashMap<String, St
                     "string" | "number" | "boolean" | "void" | "Uint8Array" => {
                         TypeRef::Primitive(underlying.clone())
                     }
-                    "Class" => TypeRef::Custom(to_pascal_case(s)), // Class types use PascalCase
                     _ => TypeRef::Custom(s.to_string()),
                 }
             } else {
@@ -51,23 +50,6 @@ pub fn string_to_type_ref_with_resolution(s: &str, type_map: &HashMap<String, St
             }
         }
     }
-}
-
-/// Convert to PascalCase
-fn to_pascal_case(s: &str) -> String {
-    let mut result = String::new();
-    let mut capitalize_next = true;
-    for c in s.chars() {
-        if c == '_' || c == '-' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(c.to_uppercase().next().unwrap());
-            capitalize_next = false;
-        } else {
-            result.push(c);
-        }
-    }
-    result
 }
 
 /// Convert a string to TypeRef (without type resolution)
