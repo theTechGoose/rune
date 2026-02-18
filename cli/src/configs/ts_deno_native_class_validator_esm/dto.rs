@@ -7,7 +7,7 @@ pub fn generate_dto_code(dto: &DtoInfo) -> String {
     let mut lines = Vec::new();
 
     // Imports
-    lines.push("import { IsString, IsNumber, IsBoolean, IsArray, ValidateNested, IsOptional } from \"class-validator\";".to_string());
+    lines.push("import { IsString, IsNumber, IsBoolean, IsArray, ValidateNested, IsOptional, validate } from \"class-validator\";".to_string());
     lines.push("import { Type, plainToInstance } from \"class-transformer\";".to_string());
     lines.push(String::new());
 

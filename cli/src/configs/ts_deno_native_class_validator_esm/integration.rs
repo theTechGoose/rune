@@ -101,14 +101,19 @@ pub fn generate_integration_test_code(req: &ReqInfo) -> String {
 /// Extract parameters needed by the core function
 fn extract_core_params(req: &ReqInfo) -> Vec<(String, String)> {
     let mut params = Vec::new();
+    let mut seen_names: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // Input DTO is always a param
     params.push(("input".to_string(), req.input_dto.clone()));
+    seen_names.insert("input".to_string());
 
-    // Add outputs from boundary steps that are used by pure steps
+    // Add outputs from boundary steps that are used by pure steps (deduplicated)
     for step in &req.steps {
         if step.boundary.is_some() && !step.output.is_empty() && step.output != "void" {
-            params.push((step.output.clone(), step.output.clone()));
+            if !seen_names.contains(&step.output) {
+                params.push((step.output.clone(), step.output.clone()));
+                seen_names.insert(step.output.clone());
+            }
         }
     }
 
