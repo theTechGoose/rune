@@ -24,8 +24,7 @@ enum Commands {
         /// Input .rune file
         input: PathBuf,
 
-        /// Configuration to use
-        #[arg(short, long)]
+        /// Configuration to use (run `rune configs` to list)
         config: String,
 
         /// Output directory (defaults to input file directory)
