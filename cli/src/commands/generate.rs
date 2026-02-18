@@ -41,6 +41,11 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
     let ext = generator.config().file_extension;
     let test_suffix = generator.config().test_suffix;
 
+    // Collect polymorphic noun names to exclude from regular pure/impure generation
+    let poly_nouns: std::collections::HashSet<_> = spec.polymorphics.iter()
+        .map(|p| p.noun.clone())
+        .collect();
+
     // Create directories
     fs::create_dir_all(dist_dir.join("dto"))
         .map_err(|e| format!("Failed to create dto directory: {}", e))?;
@@ -65,9 +70,9 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             .map_err(|e| format!("Failed to write {}: {}", file_path.display(), e))?;
     }
 
-    // Generate pure classes
+    // Generate pure classes (skip polymorphic nouns)
     for noun in &spec.nouns {
-        if !noun.is_impure {
+        if !noun.is_impure && !poly_nouns.contains(&noun.name) {
             // Create noun directory
             let noun_dir = dist_dir.join("pure").join(&noun.name);
             fs::create_dir_all(&noun_dir)
@@ -87,9 +92,9 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
         }
     }
 
-    // Generate impure classes
+    // Generate impure classes (skip polymorphic nouns)
     for noun in &spec.nouns {
-        if noun.is_impure {
+        if noun.is_impure && !poly_nouns.contains(&noun.name) {
             // Create noun directory
             let noun_dir = dist_dir.join("impure").join(&noun.name);
             fs::create_dir_all(&noun_dir)
@@ -129,10 +134,10 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             .map_err(|e| format!("Failed to write {}: {}", test_path.display(), e))?;
     }
 
-    // Generate polymorphic classes
+    // Generate polymorphic classes (in pure/ or impure/ based on boundaries)
     for poly in &spec.polymorphics {
         // Create polymorphic noun directory structure:
-        // <noun>/
+        // <pure|impure>/<noun>/
         //   mod.ts
         //   shared/
         //     mod.ts
@@ -143,15 +148,16 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
         //       mod.ts
         //       test.ts
 
-        let poly_dir = dist_dir.join("polymorphic").join(&poly.noun);
+        let purity_dir = if poly.is_impure { "impure" } else { "pure" };
+        let poly_dir = dist_dir.join(purity_dir).join(&poly.noun);
         let shared_dir = poly_dir.join("shared");
         let impl_dir = poly_dir.join("implementations");
 
         // Create directories
         fs::create_dir_all(&shared_dir)
-            .map_err(|e| format!("Failed to create polymorphic/{}/shared directory: {}", poly.noun, e))?;
+            .map_err(|e| format!("Failed to create {}/{}/shared directory: {}", purity_dir, poly.noun, e))?;
         fs::create_dir_all(&impl_dir)
-            .map_err(|e| format!("Failed to create polymorphic/{}/implementations directory: {}", poly.noun, e))?;
+            .map_err(|e| format!("Failed to create {}/{}/implementations directory: {}", purity_dir, poly.noun, e))?;
 
         // Generate main module
         let mod_content = generator.generate_poly_mod(poly);

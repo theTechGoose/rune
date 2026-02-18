@@ -44,10 +44,8 @@ pub fn generate_poly_base_test(poly: &PolyInfo) -> String {
     lines.push("import { assertEquals } from \"@std/assert\";".to_string());
     lines.push(String::new());
 
-    lines.push(format!("Deno.test(\"Base{} is abstract\", () => {{", poly.pascal_name));
-    lines.push(format!("  // Base{} cannot be instantiated directly", poly.pascal_name));
-    lines.push("  // Implementations must extend it and implement abstract methods".to_string());
-    lines.push("  assertEquals(true, true); // Placeholder".to_string());
+    lines.push(format!("Deno.test(\"Base{} exists\", () => {{", poly.pascal_name));
+    lines.push(format!("  assertEquals(typeof Base{}, \"function\");", poly.pascal_name));
     lines.push("});".to_string());
 
     lines.join("\n")
@@ -84,19 +82,26 @@ pub fn generate_poly_case_class(poly: &PolyInfo, case: &CaseInfo) -> String {
         poly.method_name, params, return_type
     ));
 
-    // Method body - call private methods
+    // Method body - call private methods (deduplicated)
     lines.push("    // TODO: implement using private methods below".to_string());
+    let mut seen_verbs_body = std::collections::HashSet::new();
     for step in &case.steps {
-        let method_name = format!("{}_{}", step.noun, step.verb);
-        lines.push(format!("    // await this.{}(...);", method_name));
+        if !seen_verbs_body.contains(&step.verb) {
+            seen_verbs_body.insert(step.verb.clone());
+            lines.push(format!("    // await this.{}(...);", step.verb));
+        }
     }
     lines.push("    throw new Error(\"Not implemented\");".to_string());
     lines.push("  }".to_string());
 
-    // Private methods for each step
+    // Private methods for each step (deduplicated by verb name)
+    let mut seen_verbs = std::collections::HashSet::new();
     for step in &case.steps {
-        lines.push(String::new());
-        lines.push(generate_private_method(step));
+        if !seen_verbs.contains(&step.verb) {
+            seen_verbs.insert(step.verb.clone());
+            lines.push(String::new());
+            lines.push(generate_private_method(step));
+        }
     }
 
     lines.push("}".to_string());
@@ -106,7 +111,6 @@ pub fn generate_poly_case_class(poly: &PolyInfo, case: &CaseInfo) -> String {
 
 /// Generate a private method for a case step
 fn generate_private_method(step: &crate::analyzer::CaseStep) -> String {
-    let method_name = format!("{}_{}", step.noun, step.verb);
     let param_types: String = step.params
         .iter()
         .map(|p| format!("{}: string", p)) // Default to string for now
@@ -152,7 +156,7 @@ fn generate_private_method(step: &crate::analyzer::CaseStep) -> String {
 
     format!(
         "  private {}{}({}): {} {{\n{}\n  }}",
-        async_keyword, method_name, param_types, promise_wrapper, body
+        async_keyword, step.verb, param_types, promise_wrapper, body
     )
 }
 
@@ -250,6 +254,7 @@ mod tests {
                     all_faults: vec![],
                 },
             ],
+            is_impure: true,
         }
     }
 
@@ -288,8 +293,8 @@ mod tests {
 
         assert!(output.contains("export class Genie extends BaseProvider"));
         assert!(output.contains("async getRecording(externalId: string): Promise<Uint8Array>"));
-        assert!(output.contains("private async provider_search"));
-        assert!(output.contains("private async provider_download"));
+        assert!(output.contains("private async search"));
+        assert!(output.contains("private async download"));
     }
 
     #[test]

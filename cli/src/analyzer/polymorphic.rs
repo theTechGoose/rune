@@ -14,6 +14,7 @@ pub struct PolyInfo {
     pub method_params: Vec<ParamInfo>,
     pub method_return_type: super::dtos::TypeRef,
     pub cases: Vec<CaseInfo>,
+    pub is_impure: bool,           // true if any step has a boundary
 }
 
 /// Information about a case within a polymorphic block
@@ -64,6 +65,9 @@ pub fn extract_polymorphic_with_types(lines: &[ParsedLine], types: &[TypeInfo]) 
             // Extract cases
             let cases = extract_cases(&lines[i+1..], &type_map);
 
+            // Determine if impure: any step in any case has a boundary
+            let is_impure = cases.iter().any(|c| c.steps.iter().any(|s| s.boundary.is_some()));
+
             polys.push(PolyInfo {
                 noun: noun.clone(),
                 pascal_name: to_pascal_case(noun),
@@ -71,6 +75,7 @@ pub fn extract_polymorphic_with_types(lines: &[ParsedLine], types: &[TypeInfo]) 
                 method_params,
                 method_return_type,
                 cases,
+                is_impure,
             });
         }
         i += 1;
