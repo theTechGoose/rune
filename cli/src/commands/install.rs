@@ -90,8 +90,8 @@ fn find_source_dir() -> Option<PathBuf> {
     None
 }
 
-/// Install Rune components
-pub fn install(editor: Option<Editor>, shell: Option<&str>, icons: IconTargets) -> Result<(), String> {
+/// Install Rune components with interactive prompts
+pub fn install() -> Result<(), String> {
     let data = data_dir();
     let bin = bin_dir();
 
@@ -117,19 +117,23 @@ pub fn install(editor: Option<Editor>, shell: Option<&str>, icons: IconTargets) 
     // Build and install LSP
     build_lsp(&bin)?;
 
-    // Shell completions
-    if let Some(shell) = shell {
-        setup_shell_completions(shell)?;
+    println!();
+
+    // Interactive prompts
+    let editors = prompt_editors()?;
+    for editor in editors {
+        setup_editor(editor, &data)?;
     }
 
     println!();
 
-    // Editor setup
-    if let Some(e) = editor {
-        setup_editor(e, &data)?;
+    if let Some(shell) = prompt_shell()? {
+        setup_shell_completions(&shell)?;
     }
 
-    // Icon setup for file managers and tools
+    println!();
+
+    let icons = prompt_icons()?;
     if icons.yazi { setup_yazi_icons()?; }
     if icons.lf { setup_lf_icons()?; }
     if icons.eza { setup_eza_icons()?; }
@@ -436,6 +440,85 @@ fn prompt_editor() -> Result<Editor, String> {
     io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
 
     Editor::from_str(input.trim()).ok_or_else(|| "Invalid selection".to_string())
+}
+
+fn prompt_editors() -> Result<Vec<Editor>, String> {
+    println!("Which editors would you like to configure?");
+    println!("(Enter numbers separated by spaces, or press Enter to skip)");
+    println!();
+    println!("  [1] Neovim");
+    println!("  [2] Helix");
+    println!("  [3] VS Code");
+    println!("  [4] Zed");
+    println!("  [5] Sublime Text");
+    println!("  [6] Emacs");
+    println!();
+
+    print!("Select: ");
+    io::stdout().flush().map_err(|e| e.to_string())?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+
+    let editors: Vec<Editor> = input
+        .trim()
+        .split_whitespace()
+        .filter_map(|s| Editor::from_str(s))
+        .collect();
+
+    Ok(editors)
+}
+
+fn prompt_shell() -> Result<Option<String>, String> {
+    println!("Configure shell completions?");
+    println!("(Enter number or press Enter to skip)");
+    println!();
+    println!("  [1] zsh");
+    println!("  [2] bash");
+    println!("  [3] fish");
+    println!();
+
+    print!("Select: ");
+    io::stdout().flush().map_err(|e| e.to_string())?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+
+    let shell = match input.trim() {
+        "1" | "zsh" => Some("zsh".to_string()),
+        "2" | "bash" => Some("bash".to_string()),
+        "3" | "fish" => Some("fish".to_string()),
+        "" => None,
+        _ => None,
+    };
+
+    Ok(shell)
+}
+
+fn prompt_icons() -> Result<IconTargets, String> {
+    println!("Configure file icons for tools?");
+    println!("(Enter numbers separated by spaces, or press Enter to skip)");
+    println!();
+    println!("  [1] yazi (file manager)");
+    println!("  [2] lf (file manager)");
+    println!("  [3] eza (ls replacement)");
+    println!("  [4] lsd (ls replacement)");
+    println!();
+
+    print!("Select: ");
+    io::stdout().flush().map_err(|e| e.to_string())?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
+
+    let selections: Vec<&str> = input.trim().split_whitespace().collect();
+
+    Ok(IconTargets {
+        yazi: selections.iter().any(|s| *s == "1" || s.to_lowercase() == "yazi"),
+        lf: selections.iter().any(|s| *s == "2" || s.to_lowercase() == "lf"),
+        eza: selections.iter().any(|s| *s == "3" || s.to_lowercase() == "eza"),
+        lsd: selections.iter().any(|s| *s == "4" || s.to_lowercase() == "lsd"),
+    })
 }
 
 fn setup_editor(editor: Editor, data_dir: &PathBuf) -> Result<(), String> {

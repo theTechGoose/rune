@@ -68,31 +68,7 @@ enum Commands {
     Configs,
 
     /// Install Rune (LSP, parser, editor integration)
-    Install {
-        /// Editor to configure
-        #[arg(short, long, value_parser = ["neovim", "helix", "vscode", "zed", "sublime", "emacs"])]
-        editor: Option<String>,
-
-        /// Shell to configure completions for
-        #[arg(short, long, value_parser = ["zsh", "bash", "fish"])]
-        shell: Option<String>,
-
-        /// Configure yazi file manager icons
-        #[arg(long)]
-        yazi: bool,
-
-        /// Configure lf file manager icons
-        #[arg(long)]
-        lf: bool,
-
-        /// Configure eza (ls replacement) icons
-        #[arg(long)]
-        eza: bool,
-
-        /// Configure lsd (ls replacement) icons
-        #[arg(long)]
-        lsd: bool,
-    },
+    Install,
 
     /// Uninstall Rune (remove LSP, parser, editor integration)
     Uninstall {
@@ -187,10 +163,8 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
 
-        Commands::Install { editor, shell, yazi, lf, eza, lsd } => {
-            let editor = editor.and_then(|e| commands::Editor::from_str(&e));
-            let icons = commands::IconTargets { yazi, lf, eza, lsd };
-            match commands::install(editor, shell.as_deref(), icons) {
+        Commands::Install => {
+            match commands::install() {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("Error: {}", e);
