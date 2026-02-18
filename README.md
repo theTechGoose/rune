@@ -62,7 +62,7 @@ Supported editors:
 - Emacs
 
 ```bash
-rune install -e <editor>    # set up editor integration
+rune install # set up editor integration
 rune uninstall -e <editor>  # remove editor integration
 ```
 
