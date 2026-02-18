@@ -18,6 +18,8 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 
 ## Install
 
+Requires Rust and a C compiler.
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
 ```
@@ -59,12 +61,6 @@ The install script supports:
 - Emacs
 
 Run `./install.sh` and select your editor, or run individual scripts from `editors/`.
-
-## Requirements
-
-- Rust (for LSP)
-- C compiler (for parser)
-- tree-sitter CLI (optional)
 
 ## License
 
