@@ -125,6 +125,137 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
     Ok(())
 }
 
+/// Uninstall Rune components
+pub fn uninstall(editor: Option<Editor>) -> Result<(), String> {
+    let data = data_dir();
+    let bin = bin_dir();
+
+    println!("Uninstalling Rune...");
+    println!();
+
+    // Remove data directory
+    if data.exists() {
+        fs::remove_dir_all(&data).map_err(|e| format!("Failed to remove data dir: {}", e))?;
+        println!("  ✓ Data directory removed");
+    }
+
+    // Remove LSP binary
+    let lsp_path = bin.join("rune-lsp");
+    if lsp_path.exists() {
+        fs::remove_file(&lsp_path).map_err(|e| format!("Failed to remove LSP: {}", e))?;
+        println!("  ✓ LSP removed");
+    }
+
+    println!();
+
+    // Editor cleanup
+    let editor = match editor {
+        Some(e) => e,
+        None => prompt_editor()?,
+    };
+
+    cleanup_editor(editor)?;
+
+    println!();
+    println!("Done!");
+
+    Ok(())
+}
+
+fn cleanup_editor(editor: Editor) -> Result<(), String> {
+    match editor {
+        Editor::Neovim => cleanup_neovim(),
+        Editor::Helix => cleanup_helix(),
+        Editor::VSCode => {
+            println!("VS Code: Remove the extension manually");
+            Ok(())
+        }
+        Editor::Zed => {
+            println!("Zed: Remove rune from your languages config manually");
+            Ok(())
+        }
+        Editor::Sublime => {
+            println!("Sublime: Remove syntax files from Packages/User/ manually");
+            Ok(())
+        }
+        Editor::Emacs => {
+            println!("Emacs: Remove rune-mode from your config manually");
+            Ok(())
+        }
+    }
+}
+
+fn cleanup_neovim() -> Result<(), String> {
+    println!("Cleaning up Neovim...");
+
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+    let nvim_site = home.join(".local/share/nvim/site");
+    let nvim_config = home.join(".config/nvim");
+
+    // Remove parser
+    let parser = nvim_site.join("parser/rune.so");
+    if parser.exists() {
+        fs::remove_file(&parser).map_err(|e| format!("Failed to remove parser: {}", e))?;
+        println!("  ✓ Parser removed");
+    }
+
+    // Remove queries
+    let queries = nvim_site.join("queries/rune");
+    if queries.exists() {
+        fs::remove_dir_all(&queries).map_err(|e| format!("Failed to remove queries: {}", e))?;
+        println!("  ✓ Queries removed");
+    }
+
+    // Remove ftdetect
+    let ftdetect = nvim_config.join("after/ftdetect/rune.lua");
+    if ftdetect.exists() {
+        fs::remove_file(&ftdetect).map_err(|e| format!("Failed to remove ftdetect: {}", e))?;
+        println!("  ✓ Filetype detection removed");
+    }
+
+    // Remove ftplugin
+    let ftplugin = nvim_config.join("after/ftplugin/rune.lua");
+    if ftplugin.exists() {
+        fs::remove_file(&ftplugin).map_err(|e| format!("Failed to remove ftplugin: {}", e))?;
+        println!("  ✓ LSP and highlights config removed");
+    }
+
+    Ok(())
+}
+
+fn cleanup_helix() -> Result<(), String> {
+    println!("Cleaning up Helix...");
+
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("helix");
+
+    // Remove queries
+    let queries = config_dir.join("runtime/queries/rune");
+    if queries.exists() {
+        fs::remove_dir_all(&queries).map_err(|e| format!("Failed to remove queries: {}", e))?;
+        println!("  ✓ Queries removed");
+    }
+
+    // Remove grammar source
+    let grammar = config_dir.join("runtime/grammars/sources/rune");
+    if grammar.exists() {
+        fs::remove_dir_all(&grammar).map_err(|e| format!("Failed to remove grammar: {}", e))?;
+        println!("  ✓ Grammar source removed");
+    }
+
+    // Remove theme
+    let theme = config_dir.join("themes/rune.toml");
+    if theme.exists() {
+        fs::remove_file(&theme).map_err(|e| format!("Failed to remove theme: {}", e))?;
+        println!("  ✓ Theme removed");
+    }
+
+    println!("  ! Remove rune config from languages.toml manually");
+
+    Ok(())
+}
+
 /// Build the tree-sitter parser from embedded sources
 fn build_parser(data: &PathBuf) -> Result<(), String> {
     println!("Building parser...");

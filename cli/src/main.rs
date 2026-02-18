@@ -67,6 +67,13 @@ enum Commands {
         #[arg(short, long)]
         editor: Option<String>,
     },
+
+    /// Uninstall Rune (remove LSP, parser, editor integration)
+    Uninstall {
+        /// Editor to unconfigure (neovim, helix, vscode, zed, sublime, emacs)
+        #[arg(short, long)]
+        editor: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -150,6 +157,17 @@ fn main() -> ExitCode {
         Commands::Install { editor } => {
             let editor = editor.and_then(|e| commands::Editor::from_str(&e));
             match commands::install(editor) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    ExitCode::FAILURE
+                }
+            }
+        }
+
+        Commands::Uninstall { editor } => {
+            let editor = editor.and_then(|e| commands::Editor::from_str(&e));
+            match commands::uninstall(editor) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("Error: {}", e);
