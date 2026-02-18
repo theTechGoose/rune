@@ -219,8 +219,7 @@ fn setup_neovim(data_dir: &PathBuf) -> Result<(), String> {
     let ftdetect_dir = nvim_config.join("after/ftdetect");
     fs::create_dir_all(&ftdetect_dir).map_err(|e| format!("Failed to create ftdetect dir: {}", e))?;
     fs::write(ftdetect_dir.join("rune.lua"), r#"vim.filetype.add({
-  filename = { [".rune"] = "rune" },
-  pattern = { [".*%.rune$"] = "rune" },
+  extension = { rune = "rune" },
 })
 "#).map_err(|e| format!("Failed to write ftdetect: {}", e))?;
     println!("  ✓ Filetype detection configured");
@@ -228,8 +227,9 @@ fn setup_neovim(data_dir: &PathBuf) -> Result<(), String> {
     // Create ftplugin with highlights and LSP
     let ftplugin_dir = nvim_config.join("after/ftplugin");
     fs::create_dir_all(&ftplugin_dir).map_err(|e| format!("Failed to create ftplugin dir: {}", e))?;
-    fs::write(ftplugin_dir.join("rune.lua"), r##"-- Register tree-sitter parser
+    fs::write(ftplugin_dir.join("rune.lua"), r##"-- Register and start tree-sitter parser
 vim.treesitter.language.register("rune", "rune")
+vim.treesitter.start()
 
 -- Mesa Vapor palette highlights
 vim.api.nvim_set_hl(0, "@rune.tag", { fg = "#89babf" })      -- muted teal
