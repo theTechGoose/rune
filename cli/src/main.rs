@@ -83,6 +83,17 @@ enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+
+    /// Render a .rune file as beautiful HTML for embedding
+    Render {
+        /// Input .rune file
+        #[arg(value_hint = ValueHint::FilePath)]
+        input: PathBuf,
+
+        /// Output HTML file (defaults to stdout)
+        #[arg(short, long, value_hint = ValueHint::FilePath)]
+        output: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -187,6 +198,16 @@ fn main() -> ExitCode {
         Commands::Completions { shell } => {
             generate(shell, &mut Cli::command(), "rune", &mut io::stdout());
             ExitCode::SUCCESS
+        }
+
+        Commands::Render { input, output } => {
+            match commands::render(&input, output.as_deref()) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    ExitCode::FAILURE
+                }
+            }
         }
     }
 }
