@@ -101,11 +101,10 @@ fn generate_all(
     fs::create_dir_all(dist_dir.join("integration"))
         .map_err(|e| format!("Failed to create integration directory: {}", e))?;
 
-    // Generate shared utilities (always overwrite - this is infrastructure)
+    // Generate shared utilities (skip if exists)
     let shared_content = generator.generate_shared();
     let shared_path = dist_dir.join("dto").join(format!("_shared.{}", ext));
-    fs::write(&shared_path, &shared_content)
-        .map_err(|e| format!("Failed to write {}: {}", shared_path.display(), e))?;
+    write_if_not_exists_in_project(&shared_path, &shared_content, existing_files)?;
 
     // Generate DTOs (skip if exists)
     for dto in &spec.dtos {
@@ -197,11 +196,10 @@ fn generate_all(
         fs::create_dir_all(&impl_dir)
             .map_err(|e| format!("Failed to create {}/{}/implementations directory: {}", purity_dir, poly.noun, e))?;
 
-        // Generate main module (always overwrite - just re-exports)
+        // Generate main module (skip if exists)
         let mod_content = generator.generate_poly_mod(poly);
         let mod_path = poly_dir.join(format!("mod.{}", ext));
-        fs::write(&mod_path, &mod_content)
-            .map_err(|e| format!("Failed to write {}: {}", mod_path.display(), e))?;
+        write_if_not_exists_in_project(&mod_path, &mod_content, existing_files)?;
 
         // Generate base class in shared/ (skip if exists)
         let base_content = generator.generate_poly_base_class(poly);
@@ -213,11 +211,10 @@ fn generate_all(
         let base_test_path = shared_dir.join(format!("mod{}.{}", test_suffix, ext));
         write_if_not_exists_in_project(&base_test_path, &base_test_content, existing_files)?;
 
-        // Generate implementations module (always overwrite - just re-exports)
+        // Generate implementations module (skip if exists)
         let impl_mod_content = generator.generate_poly_implementations_mod(poly);
         let impl_mod_path = impl_dir.join(format!("mod.{}", ext));
-        fs::write(&impl_mod_path, &impl_mod_content)
-            .map_err(|e| format!("Failed to write {}: {}", impl_mod_path.display(), e))?;
+        write_if_not_exists_in_project(&impl_mod_path, &impl_mod_content, existing_files)?;
 
         // Generate each case implementation
         for case in &poly.cases {
