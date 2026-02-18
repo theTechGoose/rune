@@ -19,12 +19,15 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 ## Install
 
 ```bash
-# Prerequisites:
-# macOS:   xcode-select --install
-# Linux:   apt install build-essential (or dnf install gcc)
-# Windows: use WSL, then follow Linux instructions
-# Rust:    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+# Prerequisites By OS:
+## macOS:   xcode-select --install
+## Linux:   apt install build-essential (or dnf install gcc)
+## Windows: use WSL, then follow Linux instructions
 
+# Runtime
+## Rust:    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Source
 git clone https://github.com/theTechGoose/rune.git
 cd rune
 ./install-cli
@@ -46,19 +49,6 @@ rune install --shell zsh    # optional: shell completions
 
 - Tree-sitter grammar with semantic captures
 - Mesa Vapor palette (earthy, muted tones)
-
-## Palette
-
-| Capture          | Color       | Hex       |
-| ---------------- | ----------- | --------- |
-| `@rune.tag`      | muted teal  | `#89babf` |
-| `@rune.noun`     | sage        | `#8a9e7a` |
-| `@rune.verb`     | dusty mauve | `#9e8080` |
-| `@rune.dto`      | moss        | `#8fb86e` |
-| `@rune.builtin`  | cream       | `#eeeeee` |
-| `@rune.boundary` | rosewood    | `#b38585` |
-| `@rune.fault`    | terracotta  | `#c9826a` |
-| `@rune.comment`  | warm gray   | `#7a7070` |
 
 ## Editors
 
