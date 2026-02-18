@@ -1,9 +1,10 @@
 //! Render command - outputs beautiful HTML for embedding .rune specs
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use rune_parser::{parse_document, LineKind};
+use rune_parser::{parse_document, LineKind, ParsedLine};
 
 /// Render a .rune file to HTML
 pub fn render(input: &Path, output: Option<&Path>) -> Result<(), String> {
@@ -30,8 +31,57 @@ pub fn render(input: &Path, output: Option<&Path>) -> Result<(), String> {
     Ok(())
 }
 
+/// Collect all definitions (DTOs, Types, Reqs) with their descriptions for linking and tooltips
+fn collect_definitions(parsed: &[ParsedLine]) -> HashMap<String, (usize, Option<String>)> {
+    let mut defs: HashMap<String, (usize, Option<String>)> = HashMap::new();
+    let mut last_def: Option<String> = None;
+
+    for line in parsed {
+        match &line.kind {
+            LineKind::DtoDef { name, .. } => {
+                defs.insert(name.clone(), (line.line_num, None));
+                last_def = Some(name.clone());
+            }
+            LineKind::TypDef { name, .. } => {
+                defs.insert(name.clone(), (line.line_num, None));
+                last_def = Some(name.clone());
+            }
+            LineKind::Req { noun, verb, input, output, .. } => {
+                let sig = format!("{}.{}({}) -> {}", noun, verb, input, output);
+                defs.entry(input.clone()).or_insert((line.line_num, None));
+                defs.entry(output.clone()).or_insert((line.line_num, None));
+                let req_key = format!("{}_{}", noun, verb);
+                defs.insert(req_key, (line.line_num, Some(sig)));
+                last_def = None;
+            }
+            LineKind::NonDef { name } => {
+                defs.insert(name.clone(), (line.line_num, None));
+                last_def = Some(name.clone());
+            }
+            LineKind::DtoDesc { text, .. } | LineKind::TypDesc { text, .. } | LineKind::NonDesc { text, .. } => {
+                if let Some(ref def_name) = last_def {
+                    if let Some((line_num, existing)) = defs.get(def_name) {
+                        let new_desc = match existing {
+                            Some(prev) => format!("{} {}", prev, text),
+                            None => text.clone(),
+                        };
+                        defs.insert(def_name.clone(), (*line_num, Some(new_desc)));
+                    }
+                }
+            }
+            LineKind::Empty => {
+                last_def = None;
+            }
+            _ => {}
+        }
+    }
+
+    defs
+}
+
 fn render_to_html(source: &str, filename: &str) -> String {
     let parsed = parse_document(source);
+    let defs = collect_definitions(&parsed);
     let lines: Vec<&str> = source.lines().collect();
     let line_count = lines.len();
     let _line_num_width = line_count.to_string().len();
@@ -41,13 +91,30 @@ fn render_to_html(source: &str, filename: &str) -> String {
     for (i, line) in lines.iter().enumerate() {
         let line_num = i + 1;
         let parsed_line = parsed.iter().find(|p| p.line_num == i);
-        let highlighted = highlight_line(line, parsed_line.map(|p| &p.kind));
+        let kind = parsed_line.map(|p| &p.kind);
+        let highlighted = highlight_line(line, kind, &defs);
+
+        let indent = line.len() - line.trim_start().len();
+        let is_block_start = indent == 0 && matches!(kind,
+            Some(LineKind::Req { .. }) |
+            Some(LineKind::DtoDef { .. }) |
+            Some(LineKind::TypDef { .. }) |
+            Some(LineKind::NonDef { .. })
+        );
+
+        let line_id = match kind {
+            Some(LineKind::DtoDef { name, .. }) | Some(LineKind::TypDef { name, .. }) | Some(LineKind::NonDef { name }) => {
+                format!(r#" id="def-{}""#, slug(name))
+            }
+            _ => String::new(),
+        };
+
+        let block_class = if is_block_start && i > 0 { " rune-block-start" } else { "" };
 
         html_lines.push(format!(
-            r#"<div class="group/line flex hover:bg-white/[0.03] transition-all duration-150 rounded-sm -mx-1 px-1">
-  <span class="select-none w-12 pr-4 text-right text-slate-600 text-xs leading-7 group-hover/line:text-slate-500 transition-colors font-mono">{num}</span>
-  <span class="flex-1 leading-7">{content}</span>
-</div>"#,
+            r#"<div{id} class="flex hover:bg-white/[0.02]{block}" style="line-height:1.5;padding:2.5px 0"><span class="select-none w-8 pr-3 text-right text-slate-600 text-xs">{num}</span><span class="flex-1">{content}</span></div>"#,
+            id = line_id,
+            block = block_class,
             num = line_num,
             content = if highlighted.is_empty() { "&nbsp;".to_string() } else { highlighted }
         ));
@@ -80,21 +147,23 @@ fn render_to_html(source: &str, filename: &str) -> String {
 
         <!-- Filename -->
         <div class="flex items-center gap-2 ml-4">
-          <span class="text-xl rune-icon">ᚱ</span>
+          <img src="data:image/png;base64,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" alt="Rune" class="w-12 h-12" style="filter: drop-shadow(0 0 8px rgba(137, 186, 191, 0.6));" />
           <span class="text-sm font-medium text-slate-300 tracking-wide">{filename}</span>
         </div>
 
         <!-- Copy button -->
-        <button onclick="navigator.clipboard.writeText(this.closest('.not-prose').querySelector('code').innerText).then(() => {{ this.innerText = 'Copied!'; setTimeout(() => this.innerText = 'Copy', 1500) }})"
+        <button onclick="navigator.clipboard.writeText(this.closest('.not-prose').querySelector('.rune-source code').innerText).then(() => {{ this.innerText = 'Copied!'; setTimeout(() => this.innerText = 'Copy', 1500) }})"
                 class="ml-auto rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 bg-white/[0.03] ring-1 ring-white/[0.08] transition-all hover:bg-white/[0.06] hover:text-slate-300 hover:ring-white/[0.12] active:scale-95">
           Copy
         </button>
       </div>
 
       <!-- Code body -->
-      <div class="relative p-5 overflow-x-auto">
-        <pre class="text-[13px]"><code>{lines}</code></pre>
+      <div class="rune-code relative px-4 py-2 overflow-x-auto text-[13px]" style="font-family: ui-monospace, 'Cascadia Code', 'Fira Code', Menlo, Monaco, 'Courier New', monospace">
+        {lines}
       </div>
+      <!-- Hidden source for copy -->
+      <pre class="rune-source" style="position:absolute;left:-9999px"><code>{raw}</code></pre>
 
       <!-- Bottom accent -->
       <div class="h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
@@ -129,10 +198,26 @@ fn render_to_html(source: &str, filename: &str) -> String {
     color: #8a9e7a;
     font-weight: 500;
   }}
+  .rune-noun-def {{
+    cursor: default;
+    transition: text-decoration 0.15s ease;
+  }}
+  .rune-noun-def:hover {{
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }}
 
   /* Verbs - dusty mauve */
   .rune-verb {{
     color: #9e8080;
+  }}
+  .rune-verb-def {{
+    cursor: default;
+    transition: text-decoration 0.15s ease;
+  }}
+  .rune-verb-def:hover {{
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }}
 
   /* DTOs - moss green with subtle bg */
@@ -182,14 +267,49 @@ fn render_to_html(source: &str, filename: &str) -> String {
   .rune-param {{
     color: #a8b5c4;
   }}
+
+  /* Block separation */
+  .rune-block-start {{
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }}
+
+  /* Clickable DTO/Type links */
+  a.rune-link {{
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+  }}
+  a.rune-link:hover .rune-dto {{
+    color: #a8d48a;
+    border-color: rgba(143, 184, 110, 0.5);
+    box-shadow: 0 0 12px rgba(143, 184, 110, 0.25);
+    background: rgba(143, 184, 110, 0.15);
+  }}
+
+  /* Smooth scroll */
+  html {{
+    scroll-behavior: smooth;
+  }}
+
+  /* Scroll target highlight */
+  :target {{
+    background: rgba(137, 186, 191, 0.1) !important;
+    border-left: 2px solid rgba(137, 186, 191, 0.5);
+    padding-left: 6px;
+    margin-left: -8px;
+  }}
 </style>
 "##,
         filename = html_escape(filename),
-        lines = html_lines.join("\n"),
+        lines = html_lines.join(""),
+        raw = html_escape(source),
     )
 }
 
-fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
+fn highlight_line(line: &str, kind: Option<&LineKind>, defs: &HashMap<String, (usize, Option<String>)>) -> String {
     let trimmed = line.trim();
     if trimmed.is_empty() {
         return String::new();
@@ -200,9 +320,11 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
 
     match kind {
         Some(LineKind::Req { noun, verb, input, output, .. }) => {
+            let input_html = dto_link(input, defs);
+            let output_html = dto_link(output, defs);
             format!(
-                r#"{}<span class="rune-tag">[REQ]</span> <span class="rune-noun">{}</span><span class="rune-punct">.</span><span class="rune-verb">{}</span><span class="rune-punct">(</span><span class="rune-dto">{}</span><span class="rune-punct">):</span> <span class="rune-dto">{}</span>"#,
-                indent_str, html_escape(noun), html_escape(verb), html_escape(input), html_escape(output)
+                r#"{}<span class="rune-tag">[REQ]</span> {}<span class="rune-punct">.</span>{}<span class="rune-punct">(</span>{}<span class="rune-punct">):</span> {}"#,
+                indent_str, noun_span(noun, defs), verb_span(noun, verb, defs), input_html, output_html
             )
         }
         Some(LineKind::Step { noun, verb, params, output, is_static, .. }) => {
@@ -214,11 +336,11 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
             let output_html = if output.is_empty() {
                 String::new()
             } else {
-                format!(r#"<span class="rune-punct">:</span> <span class="rune-dto">{}</span>"#, html_escape(output))
+                format!(r#"<span class="rune-punct">:</span> {}"#, dto_link(output, defs))
             };
             format!(
-                r#"{}<span class="rune-noun">{}</span><span class="rune-punct">{}</span><span class="rune-verb">{}</span><span class="rune-punct">(</span>{}<span class="rune-punct">)</span>{}"#,
-                indent_str, html_escape(noun), sep, html_escape(verb), params_str, output_html
+                r#"{}{}<span class="rune-punct">{}</span>{}<span class="rune-punct">(</span>{}<span class="rune-punct">)</span>{}"#,
+                indent_str, noun_span(noun, defs), sep, verb_span(noun, verb, defs), params_str, output_html
             )
         }
         Some(LineKind::BoundaryStep { prefix, noun, verb, params, output, is_static, .. }) => {
@@ -233,8 +355,8 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
                 format!(r#"<span class="rune-punct">:</span> <span class="rune-builtin">{}</span>"#, html_escape(output))
             };
             format!(
-                r#"{}<span class="rune-boundary">{}</span><span class="rune-noun">{}</span><span class="rune-punct">{}</span><span class="rune-verb">{}</span><span class="rune-punct">(</span>{}<span class="rune-punct">)</span>{}"#,
-                indent_str, html_escape(prefix), html_escape(noun), sep, html_escape(verb), params_str, output_html
+                r#"{}<span class="rune-boundary">{}</span>{}<span class="rune-punct">{}</span>{}<span class="rune-punct">(</span>{}<span class="rune-punct">)</span>{}"#,
+                indent_str, html_escape(prefix), noun_span(noun, defs), sep, verb_span(noun, verb, defs), params_str, output_html
             )
         }
         Some(LineKind::Fault { names, .. }) => {
@@ -246,7 +368,16 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
         }
         Some(LineKind::DtoDef { name, properties }) => {
             let props_str = properties.iter()
-                .map(|p| format!(r#"<span class="rune-param">{}</span>"#, html_escape(p)))
+                .map(|p| {
+                    if let Some(base) = p.strip_suffix('?') {
+                        format!(
+                            r#"<span class="rune-param">{}</span><span class="rune-comment">?</span>"#,
+                            html_escape(base)
+                        )
+                    } else {
+                        format!(r#"<span class="rune-param">{}</span>"#, html_escape(p))
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(r#"<span class="rune-punct">, </span>"#);
             format!(
@@ -258,12 +389,37 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
             format!(r#"{}<span class="rune-comment">{}</span>"#, indent_str, html_escape(text))
         }
         Some(LineKind::TypDef { name, type_name }) => {
+            let type_html = if type_name.contains('"') && type_name.contains('|') {
+                // String enum: style each quoted value and pipe separator
+                type_name.split('|')
+                    .map(|part| {
+                        let part = part.trim();
+                        if part.starts_with('"') && part.ends_with('"') {
+                            format!(r#"<span class="rune-fault">{}</span>"#, html_escape(part))
+                        } else {
+                            html_escape(part)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(r#" <span class="rune-punct">|</span> "#)
+            } else {
+                format!(r#"<span class="rune-builtin">{}</span>"#, html_escape(type_name))
+            };
             format!(
-                r#"{}<span class="rune-tag">[TYP]</span> <span class="rune-noun">{}</span><span class="rune-punct">:</span> <span class="rune-builtin">{}</span>"#,
-                indent_str, html_escape(name), html_escape(type_name)
+                r#"{}<span class="rune-tag">[TYP]</span> {}<span class="rune-punct">:</span> {}"#,
+                indent_str, noun_span(name, defs), type_html
             )
         }
         Some(LineKind::TypDesc { text, .. }) => {
+            format!(r#"{}<span class="rune-comment">{}</span>"#, indent_str, html_escape(text))
+        }
+        Some(LineKind::NonDef { name }) => {
+            format!(
+                r#"{}<span class="rune-tag">[NON]</span> {}"#,
+                indent_str, noun_span(name, defs)
+            )
+        }
+        Some(LineKind::NonDesc { text, .. }) => {
             format!(r#"{}<span class="rune-comment">{}</span>"#, indent_str, html_escape(text))
         }
         Some(LineKind::Ply { noun, verb, params, output, is_static, .. }) => {
@@ -275,36 +431,36 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
             let output_html = if output.is_empty() {
                 String::new()
             } else {
-                format!(r#"<span class="rune-punct">:</span> <span class="rune-dto">{}</span>"#, html_escape(output))
+                format!(r#"<span class="rune-punct">:</span> {}"#, dto_link(output, defs))
             };
             format!(
-                r#"{}<span class="rune-tag">[PLY]</span> <span class="rune-noun">{}</span><span class="rune-punct">{}</span><span class="rune-verb">{}</span><span class="rune-punct">(</span>{}<span class="rune-punct">)</span>{}"#,
-                indent_str, html_escape(noun), sep, html_escape(verb), params_str, output_html
+                r#"{}<span class="rune-tag">[PLY]</span> {}<span class="rune-punct">{}</span>{}<span class="rune-punct">(</span>{}<span class="rune-punct">)</span>{}"#,
+                indent_str, noun_span(noun, defs), sep, verb_span(noun, verb, defs), params_str, output_html
             )
         }
         Some(LineKind::Cse { name, .. }) => {
             format!(
-                r#"{}<span class="rune-tag">[CSE]</span> <span class="rune-noun">{}</span>"#,
-                indent_str, html_escape(name)
+                r#"{}<span class="rune-tag">[CSE]</span> {}"#,
+                indent_str, noun_span(name, defs)
             )
         }
         Some(LineKind::Ret { value, .. }) => {
             format!(
-                r#"{}<span class="rune-tag">[RET]</span> <span class="rune-dto">{}</span>"#,
-                indent_str, html_escape(value)
+                r#"{}<span class="rune-tag">[RET]</span> {}"#,
+                indent_str, dto_link(value, defs)
             )
         }
-        Some(LineKind::Ctr { class_name, .. }) => {
+        Some(LineKind::New { class_name, .. }) => {
             format!(
-                r#"{}<span class="rune-tag">[CTR]</span> <span class="rune-noun">{}</span>"#,
-                indent_str, html_escape(class_name)
+                r#"{}<span class="rune-tag">[NEW]</span> {}"#,
+                indent_str, noun_span(class_name, defs)
             )
         }
         Some(LineKind::Comment { text, .. }) => {
             format!(r#"{}<span class="rune-comment">// {}</span>"#, indent_str, html_escape(text))
         }
         Some(LineKind::DtoRef(name)) => {
-            format!(r#"{}<span class="rune-dto">{}</span>"#, indent_str, html_escape(name))
+            format!("{}{}", indent_str, dto_link(name, defs))
         }
         Some(LineKind::Empty) => String::new(),
         Some(LineKind::MultilineContinuation { .. }) => {
@@ -316,6 +472,59 @@ fn highlight_line(line: &str, kind: Option<&LineKind>) -> String {
             format!("{}{}", indent_str, html_escape(trimmed))
         }
     }
+}
+
+fn noun_span(name: &str, defs: &HashMap<String, (usize, Option<String>)>) -> String {
+    let escaped = html_escape(name);
+    match defs.get(name) {
+        Some((_, Some(desc))) => {
+            format!(r#"<span class="rune-noun rune-noun-def" title="{}">{}</span>"#, html_escape(desc), escaped)
+        }
+        Some((_, None)) => {
+            format!(r#"<span class="rune-noun rune-noun-def">{}</span>"#, escaped)
+        }
+        None => {
+            format!(r#"<span class="rune-noun">{}</span>"#, escaped)
+        }
+    }
+}
+
+fn verb_span(noun: &str, verb: &str, defs: &HashMap<String, (usize, Option<String>)>) -> String {
+    let escaped = html_escape(verb);
+    let key = format!("{}_{}", noun, verb);
+    match defs.get(&key) {
+        Some((_, Some(desc))) => {
+            format!(r#"<span class="rune-verb rune-verb-def" title="{}">{}</span>"#, html_escape(desc), escaped)
+        }
+        Some((_, None)) => {
+            format!(r#"<span class="rune-verb rune-verb-def">{}</span>"#, escaped)
+        }
+        None => {
+            format!(r#"<span class="rune-verb">{}</span>"#, escaped)
+        }
+    }
+}
+
+fn dto_link(name: &str, defs: &HashMap<String, (usize, Option<String>)>) -> String {
+    let escaped = html_escape(name);
+    if let Some((_, desc)) = defs.get(name) {
+        let title_attr = match desc {
+            Some(d) => format!(r#" title="{}""#, html_escape(d)),
+            None => String::new(),
+        };
+        format!(
+            r##"<a href="#def-{}" class="rune-link"{}><span class="rune-dto">{}</span></a>"##,
+            slug(name), title_attr, escaped
+        )
+    } else {
+        format!(r#"<span class="rune-dto">{}</span>"#, escaped)
+    }
+}
+
+fn slug(s: &str) -> String {
+    s.chars()
+        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect()
 }
 
 fn html_escape(s: &str) -> String {

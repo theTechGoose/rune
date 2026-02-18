@@ -24,12 +24,12 @@ pub fn init(project_name: &str, config_name: &str) -> Result<(), String> {
     example.toDto(): ExampleDto
 
 
+[NON] example
+    example domain object
 [TYP] id: string
     unique identifier for the example
 [TYP] name: string
     name of the example
-[TYP] example: Class
-    example domain object
 
 
 [DTO] CreateExampleDto: name

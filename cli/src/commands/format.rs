@@ -26,6 +26,7 @@ fn format_content(content: &str) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut in_block = false;
     let mut consecutive_empty = 0;
+    let mut after_step = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -37,6 +38,7 @@ fn format_content(content: &str) -> String {
                 lines.push(String::new());
             }
             in_block = false;
+            after_step = false;
             continue;
         }
 
@@ -47,30 +49,37 @@ fn format_content(content: &str) -> String {
             // REQ at column 0
             lines.push(trimmed.to_string());
             in_block = true;
-        } else if trimmed.starts_with("[DTO]") || trimmed.starts_with("[TYP]") {
+            after_step = false;
+        } else if trimmed.starts_with("[DTO]") || trimmed.starts_with("[TYP]") || trimmed.starts_with("[NON]") {
             // Definitions at column 0
             lines.push(trimmed.to_string());
             in_block = true;
-        } else if trimmed.starts_with("[PLY]") || trimmed.starts_with("[CTR]") || trimmed.starts_with("[RET]") {
+            after_step = false;
+        } else if trimmed.starts_with("[PLY]") || trimmed.starts_with("[NEW]") || trimmed.starts_with("[RET]") {
             // Tags at 4 spaces inside blocks
             lines.push(format!("    {}", trimmed));
+            after_step = false;
         } else if trimmed.starts_with("[CSE]") {
             // Case at 8 spaces
             lines.push(format!("        {}", trimmed));
+            after_step = false;
         } else if is_step_line(trimmed) {
             // Steps at 4 spaces (or 8 inside poly block)
             let indent = if in_poly_context(&lines) { 8 } else { 4 };
             lines.push(format!("{}{}", " ".repeat(indent), trimmed));
-        } else if is_fault_line(trimmed) {
+            after_step = true;
+        } else if after_step && is_fault_line(trimmed) {
             // Faults at 6 spaces (or 10 inside poly block)
             let indent = if in_poly_context(&lines) { 10 } else { 6 };
             lines.push(format!("{}{}", " ".repeat(indent), trimmed));
         } else if in_block && (trimmed.starts_with("//") || !trimmed.contains(':')) {
             // Description or comment lines at 4 spaces
             lines.push(format!("    {}", trimmed));
+            after_step = false;
         } else {
             // Preserve original indentation for unknown lines
             lines.push(line.to_string());
+            after_step = false;
         }
     }
 
@@ -101,8 +110,7 @@ fn is_step_line(s: &str) -> bool {
 fn is_fault_line(s: &str) -> bool {
     let parts: Vec<&str> = s.split_whitespace().collect();
     !parts.is_empty() && parts.iter().all(|p| {
-        p.contains('-')
-            && p.chars().all(|c| c.is_lowercase() || c.is_numeric() || c == '-')
+        p.chars().all(|c| c.is_lowercase() || c.is_numeric() || c == '-')
             && p.chars().next().map(|c| c.is_lowercase()).unwrap_or(false)
     })
 }
@@ -111,7 +119,7 @@ fn in_poly_context(lines: &[String]) -> bool {
     // Check if we're inside a [PLY] block
     for line in lines.iter().rev() {
         let trimmed = line.trim();
-        if trimmed.starts_with("[REQ]") || trimmed.starts_with("[DTO]") || trimmed.starts_with("[TYP]") {
+        if trimmed.starts_with("[REQ]") || trimmed.starts_with("[DTO]") || trimmed.starts_with("[TYP]") || trimmed.starts_with("[NON]") {
             return false;
         }
         if trimmed.starts_with("[PLY]") {

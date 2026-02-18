@@ -68,7 +68,11 @@ enum Commands {
     Configs,
 
     /// Install Rune (LSP, parser, editor integration)
-    Install,
+    Install {
+        /// Skip interactive prompts (defaults to neovim, zsh, yazi)
+        #[arg(short = 'y', long = "yes")]
+        yes: bool,
+    },
 
     /// Uninstall Rune (remove LSP, parser, editor integration)
     Uninstall {
@@ -174,8 +178,8 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
 
-        Commands::Install => {
-            match commands::install() {
+        Commands::Install { yes } => {
+            match commands::install(yes) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("Error: {}", e);
