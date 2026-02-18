@@ -7,7 +7,7 @@ mod types;
 mod faults;
 mod requirements;
 
-pub use nouns::*;
+pub use nouns::{NounInfo, to_pascal_case, extract_nouns, extract_nouns_with_types};
 pub use methods::*;
 pub use dtos::*;
 pub use types::*;
@@ -32,7 +32,8 @@ pub fn analyze(text: &str) -> AnalyzedSpec {
     let dtos = extract_dtos(&lines);
     let types = extract_types(&lines);
     let requirements = extract_requirements(&lines);
-    let nouns = extract_nouns(&lines);
+    // Pass types to noun extraction for type resolution
+    let nouns = extract_nouns_with_types(&lines, &types);
 
     AnalyzedSpec {
         dtos,

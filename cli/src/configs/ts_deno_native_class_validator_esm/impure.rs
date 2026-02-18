@@ -37,8 +37,11 @@ pub fn generate_impure_class_code(noun: &NounInfo) -> String {
     // Class definition
     lines.push(format!("export class {} {{", noun.pascal_name));
 
-    // Constructor with shared params
-    if !noun.constructor_params.is_empty() {
+    // Constructor with shared params (use typed params if available)
+    if !noun.constructor_param_infos.is_empty() {
+        let params = format_typed_constructor_params(&noun.constructor_param_infos);
+        lines.push(format!("  constructor(private readonly {}) {{}}", params));
+    } else if !noun.constructor_params.is_empty() {
         let params = format_constructor_params(&noun.constructor_params);
         lines.push(format!("  constructor(private readonly {}) {{}}", params));
     }
@@ -116,6 +119,14 @@ fn format_constructor_params(params: &[String]) -> String {
     params
         .iter()
         .map(|p| format!("{}: {}", p, p))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn format_typed_constructor_params(params: &[crate::analyzer::ParamInfo]) -> String {
+    params
+        .iter()
+        .map(|p| format!("{}: {}", p.name, type_ref_to_ts(&p.type_ref)))
         .collect::<Vec<_>>()
         .join(", ")
 }
@@ -224,6 +235,7 @@ mod tests {
             is_impure: true,
             boundary_types: vec!["os:".to_string(), "fs:".to_string()],
             constructor_params: vec![],
+            constructor_param_infos: vec![],
             methods: vec![],
         };
 
@@ -240,6 +252,7 @@ mod tests {
             is_impure: true,
             boundary_types: vec!["os:".to_string()],
             constructor_params: vec![],
+            constructor_param_infos: vec![],
             methods: vec![
                 MethodInfo {
                     name: "save".to_string(),
@@ -270,6 +283,7 @@ mod tests {
             is_impure: true,
             boundary_types: vec!["db:".to_string()],
             constructor_params: vec![],
+            constructor_param_infos: vec![],
             methods: vec![
                 MethodInfo {
                     name: "set".to_string(),
@@ -300,6 +314,7 @@ mod tests {
             is_impure: true,
             boundary_types: vec!["os:".to_string()],
             constructor_params: vec![],
+            constructor_param_infos: vec![],
             methods: vec![
                 MethodInfo {
                     name: "save".to_string(),
@@ -325,6 +340,7 @@ mod tests {
             is_impure: true,
             boundary_types: vec!["os:".to_string()],
             constructor_params: vec![],
+            constructor_param_infos: vec![],
             methods: vec![
                 MethodInfo {
                     name: "save".to_string(),

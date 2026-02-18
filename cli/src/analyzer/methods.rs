@@ -1,7 +1,9 @@
 //! Method extraction from parsed .rune files
 
+use std::collections::HashMap;
 use rune_parser::{ParsedLine, LineKind};
 use super::dtos::TypeRef;
+use super::types::TypeInfo;
 
 /// Information about a method
 #[derive(Debug, Clone)]
@@ -21,13 +23,56 @@ pub struct ParamInfo {
     pub type_ref: TypeRef,
 }
 
-/// Convert a string to TypeRef
-pub fn string_to_type_ref(s: &str) -> TypeRef {
+/// Build a type resolution map from type definitions
+pub fn build_type_map(types: &[TypeInfo]) -> HashMap<String, String> {
+    types
+        .iter()
+        .map(|t| (t.name.clone(), t.underlying_type.clone()))
+        .collect()
+}
+
+/// Convert a string to TypeRef, resolving custom types if a type map is provided
+pub fn string_to_type_ref_with_resolution(s: &str, type_map: &HashMap<String, String>) -> TypeRef {
     match s {
         "string" | "number" | "boolean" | "void" | "Uint8Array" => TypeRef::Primitive(s.to_string()),
         s if s.ends_with("Dto") => TypeRef::Dto(s.to_string()),
-        s => TypeRef::Custom(s.to_string()),
+        s => {
+            // Try to resolve custom type to its underlying primitive
+            if let Some(underlying) = type_map.get(s) {
+                match underlying.as_str() {
+                    "string" | "number" | "boolean" | "void" | "Uint8Array" => {
+                        TypeRef::Primitive(underlying.clone())
+                    }
+                    "Class" => TypeRef::Custom(to_pascal_case(s)), // Class types use PascalCase
+                    _ => TypeRef::Custom(s.to_string()),
+                }
+            } else {
+                TypeRef::Custom(s.to_string())
+            }
+        }
     }
+}
+
+/// Convert to PascalCase
+fn to_pascal_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = true;
+    for c in s.chars() {
+        if c == '_' || c == '-' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(c.to_uppercase().next().unwrap());
+            capitalize_next = false;
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Convert a string to TypeRef (without type resolution)
+pub fn string_to_type_ref(s: &str) -> TypeRef {
+    string_to_type_ref_with_resolution(s, &HashMap::new())
 }
 
 /// Extract methods from step lines, associating faults with their parent step

@@ -2,7 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 use rune_parser::{ParsedLine, LineKind};
-use super::methods::{MethodInfo, ParamInfo, string_to_type_ref};
+use super::methods::{MethodInfo, ParamInfo, string_to_type_ref_with_resolution, build_type_map};
+use super::types::TypeInfo;
 
 /// Information about a noun (class)
 #[derive(Debug, Clone)]
@@ -11,7 +12,8 @@ pub struct NounInfo {
     pub pascal_name: String,
     pub is_impure: bool,                    // has any boundary method
     pub boundary_types: Vec<String>,        // ["mq:", "fs:"] for impure classes
-    pub constructor_params: Vec<String>,    // repeated params across methods
+    pub constructor_params: Vec<String>,    // repeated params across methods (names only, for backwards compat)
+    pub constructor_param_infos: Vec<ParamInfo>,  // typed constructor params
     pub methods: Vec<MethodInfo>,
 }
 
@@ -36,6 +38,13 @@ pub fn to_pascal_case(s: &str) -> String {
 
 /// Extract all nouns from parsed lines and classify them
 pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
+    extract_nouns_with_types(lines, &[])
+}
+
+/// Extract all nouns from parsed lines with type resolution
+pub fn extract_nouns_with_types(lines: &[ParsedLine], types: &[TypeInfo]) -> Vec<NounInfo> {
+    let type_map = build_type_map(types);
+
     // Collect all methods grouped by noun
     let mut noun_methods: HashMap<String, Vec<MethodInfo>> = HashMap::new();
     let mut noun_boundaries: HashMap<String, HashSet<String>> = HashMap::new();
@@ -50,9 +59,9 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
                     is_static: *is_static,
                     params: params.iter().map(|p| ParamInfo {
                         name: p.clone(),
-                        type_ref: string_to_type_ref(p),
+                        type_ref: string_to_type_ref_with_resolution(p, &type_map),
                     }).collect(),
-                    return_type: string_to_type_ref(output),
+                    return_type: string_to_type_ref_with_resolution(output, &type_map),
                     boundary: None,
                     faults,
                 };
@@ -65,9 +74,9 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
                     is_static: *is_static,
                     params: params.iter().map(|p| ParamInfo {
                         name: p.clone(),
-                        type_ref: string_to_type_ref(p),
+                        type_ref: string_to_type_ref_with_resolution(p, &type_map),
                     }).collect(),
-                    return_type: string_to_type_ref(output),
+                    return_type: string_to_type_ref_with_resolution(output, &type_map),
                     boundary: Some(prefix.clone()),
                     faults,
                 };
@@ -81,9 +90,9 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
                     is_static: *is_static,
                     params: params.iter().map(|p| ParamInfo {
                         name: p.clone(),
-                        type_ref: string_to_type_ref(p),
+                        type_ref: string_to_type_ref_with_resolution(p, &type_map),
                     }).collect(),
-                    return_type: string_to_type_ref(output),
+                    return_type: string_to_type_ref_with_resolution(output, &type_map),
                     boundary: None,
                     faults,
                 };
@@ -109,7 +118,7 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
         let unique_methods = deduplicate_methods(methods);
 
         // Infer constructor params: params that appear in multiple methods
-        let constructor_params = infer_constructor_params(&unique_methods);
+        let (constructor_params, constructor_param_infos) = infer_constructor_params(&unique_methods);
 
         nouns.push(NounInfo {
             pascal_name: to_pascal_case(&name),
@@ -117,6 +126,7 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
             is_impure,
             boundary_types,
             constructor_params,
+            constructor_param_infos,
             methods: unique_methods,
         });
     }
@@ -144,31 +154,44 @@ fn deduplicate_methods(methods: Vec<MethodInfo>) -> Vec<MethodInfo> {
 }
 
 /// Infer constructor parameters: params that appear in multiple methods
-fn infer_constructor_params(methods: &[MethodInfo]) -> Vec<String> {
+/// Returns both names (for backwards compat) and typed params
+fn infer_constructor_params(methods: &[MethodInfo]) -> (Vec<String>, Vec<ParamInfo>) {
     if methods.len() < 2 {
-        return Vec::new();
+        return (Vec::new(), Vec::new());
     }
 
-    // Count occurrences of each param across all methods
+    // Count occurrences of each param across all methods and track type
     let mut param_counts: HashMap<String, usize> = HashMap::new();
+    let mut param_types: HashMap<String, ParamInfo> = HashMap::new();
 
     for method in methods {
         // Use a set to avoid counting the same param twice in one method
         let unique_params: HashSet<_> = method.params.iter().map(|p| &p.name).collect();
-        for param in unique_params {
-            *param_counts.entry(param.clone()).or_default() += 1;
+        for param in &method.params {
+            if unique_params.contains(&param.name) {
+                *param_counts.entry(param.name.clone()).or_default() += 1;
+                // Store the type from the first method that has this param
+                param_types.entry(param.name.clone()).or_insert_with(|| param.clone());
+            }
         }
     }
 
     // Params that appear in more than one method
     let mut constructor_params: Vec<String> = param_counts
-        .into_iter()
-        .filter(|(_, count)| *count > 1)
-        .map(|(name, _)| name)
+        .iter()
+        .filter(|(_, count)| **count > 1)
+        .map(|(name, _)| name.clone())
         .collect();
 
     constructor_params.sort();
-    constructor_params
+
+    // Build typed params in the same order
+    let constructor_param_infos: Vec<ParamInfo> = constructor_params
+        .iter()
+        .filter_map(|name| param_types.get(name).cloned())
+        .collect();
+
+    (constructor_params, constructor_param_infos)
 }
 
 /// Collect faults from lines following a step
