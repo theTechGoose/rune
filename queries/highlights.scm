@@ -20,6 +20,9 @@
 ; Verbs: actions (after . or ::)
 (method_name) @rune.verb
 
+; Function names: camelCase REQ signatures
+(function_name) @rune.boundary
+
 ; DTOs: type contracts
 (dto_reference) @rune.dto
 (dto_def_name) @rune.dto
