@@ -7,13 +7,15 @@
 (typ_tag) @rune.tag
 (ply_tag) @rune.tag
 (cse_tag) @rune.tag
-(ctr_tag) @rune.tag
+(new_tag) @rune.tag
 (ret_tag) @rune.tag
+(non_tag) @rune.tag
 
 ; Nouns: subjects (before . or ::)
 (signature (identifier) @rune.noun)
-(ctr_step (identifier) @rune.noun)
+(new_step (identifier) @rune.noun)
 (cse_step (identifier) @rune.noun)
+(non_definition (identifier) @rune.noun)
 
 ; Verbs: actions (after . or ::)
 (method_name) @rune.verb
@@ -27,15 +29,22 @@
 (typ_generic_type (type_name) @rune.builtin)
 (typ_tuple_type (type_name) @rune.builtin)
 
+; String enum values
+(typ_enum_value) @rune.fault
+
 ; Boundaries: system edges
 (boundary_prefix) @rune.boundary
 
 ; Faults: errors (reserved warm color)
-(fault_name) @rune.fault
+(fault_line) @rune.fault
+
+; Optional marker
+(dto_optional_marker) @rune.comment
 
 ; Comments + Punctuation: chrome
 (typ_desc) @rune.comment
 (dto_desc) @rune.comment
+(non_desc) @rune.comment
 (comment) @rune.comment
 (inline_dto "{" @rune.comment)
 (inline_dto "}" @rune.comment)
