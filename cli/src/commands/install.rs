@@ -26,6 +26,14 @@ pub enum Editor {
     Emacs,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub struct IconTargets {
+    pub yazi: bool,
+    pub lf: bool,
+    pub eza: bool,
+    pub lsd: bool,
+}
+
 impl Editor {
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
@@ -83,7 +91,7 @@ fn find_source_dir() -> Option<PathBuf> {
 }
 
 /// Install Rune components
-pub fn install(editor: Option<Editor>, shell: Option<&str>) -> Result<(), String> {
+pub fn install(editor: Option<Editor>, shell: Option<&str>, icons: IconTargets) -> Result<(), String> {
     let data = data_dir();
     let bin = bin_dir();
 
@@ -120,6 +128,12 @@ pub fn install(editor: Option<Editor>, shell: Option<&str>) -> Result<(), String
     if let Some(e) = editor {
         setup_editor(e, &data)?;
     }
+
+    // Icon setup for file managers and tools
+    if icons.yazi { setup_yazi_icons()?; }
+    if icons.lf { setup_lf_icons()?; }
+    if icons.eza { setup_eza_icons()?; }
+    if icons.lsd { setup_lsd_icons()?; }
 
     println!();
     println!("Done!");
@@ -509,6 +523,23 @@ vim.lsp.start({
 "##).map_err(|e| format!("Failed to write ftplugin: {}", e))?;
     println!("  ✓ LSP and highlights configured");
 
+    // Create icon config for nvim-web-devicons (auto-loads from after/plugin/)
+    let plugin_dir = nvim_config.join("after/plugin");
+    fs::create_dir_all(&plugin_dir).map_err(|e| format!("Failed to create plugin dir: {}", e))?;
+    fs::write(plugin_dir.join("rune-icons.lua"), r##"-- Rune file icon for nvim-web-devicons
+local ok, devicons = pcall(require, "nvim-web-devicons")
+if ok then
+  devicons.set_icon({
+    rune = {
+      icon = "ᚱ",
+      color = "#89babf",
+      name = "Rune"
+    }
+  })
+end
+"##).map_err(|e| format!("Failed to write icon config: {}", e))?;
+    println!("  ✓ File icon configured (nvim-web-devicons)");
+
     Ok(())
 }
 
@@ -552,6 +583,145 @@ command = "rune-lsp"
         fs::write(&languages_path, languages_content)
             .map_err(|e| format!("Failed to write languages.toml: {}", e))?;
         println!("  ✓ Language config created");
+    }
+
+    Ok(())
+}
+
+// Marker comments for config injection
+const RUNE_BEGIN: &str = "# BEGIN RUNE CONFIG";
+const RUNE_END: &str = "# END RUNE CONFIG";
+
+fn setup_yazi_icons() -> Result<(), String> {
+    println!("Setting up yazi icons...");
+
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("yazi");
+    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create yazi config dir: {}", e))?;
+
+    // Write standalone rune icon config
+    let rune_config = config_dir.join("rune.toml");
+    fs::write(&rune_config, r#"# Rune file icon - sourced by theme.toml
+[[icon.rules]]
+name = "*.rune"
+text = "ᚱ"
+"#).map_err(|e| format!("Failed to write rune.toml: {}", e))?;
+
+    // Check if theme.toml exists and add prepend_rules if needed
+    let theme_path = config_dir.join("theme.toml");
+    let prepend_line = format!("{}\nprepend_rules = \"~/.config/yazi/rune.toml\"\n{}\n", RUNE_BEGIN, RUNE_END);
+
+    if theme_path.exists() {
+        let content = fs::read_to_string(&theme_path)
+            .map_err(|e| format!("Failed to read theme.toml: {}", e))?;
+        if !content.contains("rune.toml") {
+            // Append to existing theme.toml
+            let new_content = format!("{}\n\n[icon]\n{}", content.trim_end(), prepend_line);
+            fs::write(&theme_path, new_content)
+                .map_err(|e| format!("Failed to update theme.toml: {}", e))?;
+            println!("  ✓ Added rune icon to theme.toml");
+        } else {
+            println!("  ✓ Rune icon already configured");
+        }
+    } else {
+        fs::write(&theme_path, format!("[icon]\n{}", prepend_line))
+            .map_err(|e| format!("Failed to create theme.toml: {}", e))?;
+        println!("  ✓ Created theme.toml with rune icon");
+    }
+
+    Ok(())
+}
+
+fn setup_lf_icons() -> Result<(), String> {
+    println!("Setting up lf icons...");
+
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("lf");
+    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create lf config dir: {}", e))?;
+
+    let icons_path = config_dir.join("icons");
+    let rune_line = "*.rune ᚱ";
+
+    if icons_path.exists() {
+        let content = fs::read_to_string(&icons_path)
+            .map_err(|e| format!("Failed to read icons: {}", e))?;
+        if !content.contains(rune_line) {
+            let new_content = format!("{}\n{}\n{}\n{}\n", content.trim_end(), RUNE_BEGIN, rune_line, RUNE_END);
+            fs::write(&icons_path, new_content)
+                .map_err(|e| format!("Failed to update icons: {}", e))?;
+            println!("  ✓ Added rune icon");
+        } else {
+            println!("  ✓ Rune icon already configured");
+        }
+    } else {
+        fs::write(&icons_path, format!("{}\n{}\n{}\n", RUNE_BEGIN, rune_line, RUNE_END))
+            .map_err(|e| format!("Failed to create icons: {}", e))?;
+        println!("  ✓ Created icons file with rune icon");
+    }
+
+    Ok(())
+}
+
+fn setup_eza_icons() -> Result<(), String> {
+    println!("Setting up eza icons...");
+
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("eza");
+    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create eza config dir: {}", e))?;
+
+    let theme_path = config_dir.join("theme.yml");
+
+    // eza uses YAML - we'll create/update the theme file
+    if theme_path.exists() {
+        let content = fs::read_to_string(&theme_path)
+            .map_err(|e| format!("Failed to read theme.yml: {}", e))?;
+        if !content.contains("*.rune") {
+            let rune_config = format!("\n{}\nicons:\n  filenames:\n    \"*.rune\": \"ᚱ\"\n{}\n", RUNE_BEGIN, RUNE_END);
+            let new_content = format!("{}{}", content.trim_end(), rune_config);
+            fs::write(&theme_path, new_content)
+                .map_err(|e| format!("Failed to update theme.yml: {}", e))?;
+            println!("  ✓ Added rune icon");
+        } else {
+            println!("  ✓ Rune icon already configured");
+        }
+    } else {
+        fs::write(&theme_path, format!("{}\nicons:\n  filenames:\n    \"*.rune\": \"ᚱ\"\n{}\n", RUNE_BEGIN, RUNE_END))
+            .map_err(|e| format!("Failed to create theme.yml: {}", e))?;
+        println!("  ✓ Created theme.yml with rune icon");
+    }
+
+    Ok(())
+}
+
+fn setup_lsd_icons() -> Result<(), String> {
+    println!("Setting up lsd icons...");
+
+    let config_dir = dirs::config_dir()
+        .ok_or("Could not find config directory")?
+        .join("lsd");
+    fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create lsd config dir: {}", e))?;
+
+    let icons_path = config_dir.join("icons.yaml");
+
+    if icons_path.exists() {
+        let content = fs::read_to_string(&icons_path)
+            .map_err(|e| format!("Failed to read icons.yaml: {}", e))?;
+        if !content.contains("rune:") {
+            let rune_config = format!("\n{}\nextension:\n  rune: ᚱ\n{}\n", RUNE_BEGIN, RUNE_END);
+            let new_content = format!("{}{}", content.trim_end(), rune_config);
+            fs::write(&icons_path, new_content)
+                .map_err(|e| format!("Failed to update icons.yaml: {}", e))?;
+            println!("  ✓ Added rune icon");
+        } else {
+            println!("  ✓ Rune icon already configured");
+        }
+    } else {
+        fs::write(&icons_path, format!("{}\nextension:\n  rune: ᚱ\n{}\n", RUNE_BEGIN, RUNE_END))
+            .map_err(|e| format!("Failed to create icons.yaml: {}", e))?;
+        println!("  ✓ Created icons.yaml with rune icon");
     }
 
     Ok(())

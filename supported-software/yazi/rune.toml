@@ -1,0 +1,4 @@
+# Rune icon rule - append to [icon] section in theme.toml
+[[icon.rules]]
+name = "*.rune"
+text = "ᚱ"

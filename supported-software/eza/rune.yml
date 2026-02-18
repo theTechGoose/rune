@@ -1,0 +1,4 @@
+# Rune file icon - merge into theme.yml
+icons:
+  filenames:
+    "*.rune": "ᚱ"
