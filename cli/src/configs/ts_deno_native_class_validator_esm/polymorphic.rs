@@ -7,7 +7,7 @@ pub fn generate_poly_mod(poly: &PolyInfo) -> String {
     let mut lines = Vec::new();
 
     lines.push(format!("export {{ Base{} }} from \"./shared/mod.ts\";", poly.pascal_name));
-    lines.push("export * as Implementations from \"./implementations/mod.ts\";".to_string());
+    lines.push(format!("export * as {}s from \"./implementations/mod.ts\";", poly.pascal_name));
 
     lines.join("\n")
 }
@@ -264,7 +264,7 @@ mod tests {
         let output = generate_poly_mod(&poly);
 
         assert!(output.contains("export { BaseProvider } from \"./shared/mod.ts\""));
-        assert!(output.contains("export * as Implementations from \"./implementations/mod.ts\""));
+        assert!(output.contains("export * as Providers from \"./implementations/mod.ts\""));
     }
 
     #[test]
