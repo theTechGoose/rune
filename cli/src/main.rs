@@ -60,6 +60,13 @@ enum Commands {
 
     /// List available configurations
     Configs,
+
+    /// Install Rune (LSP, parser, editor integration)
+    Install {
+        /// Editor to configure (neovim, helix, vscode, zed, sublime, emacs)
+        #[arg(short, long)]
+        editor: Option<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -138,6 +145,17 @@ fn main() -> ExitCode {
                 println!("  - {}", config);
             }
             ExitCode::SUCCESS
+        }
+
+        Commands::Install { editor } => {
+            let editor = editor.and_then(|e| commands::Editor::from_str(&e));
+            match commands::install(editor) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    ExitCode::FAILURE
+                }
+            }
         }
     }
 }
