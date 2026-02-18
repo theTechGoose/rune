@@ -4,6 +4,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Editor {
@@ -93,19 +94,14 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
         fs::copy(&grammar_src, data.join("grammar/grammar.js"))
             .map_err(|e| format!("Failed to copy grammar.js: {}", e))?;
     }
-    let parser_src = source.join("grammar/src");
-    if parser_src.exists() {
-        copy_dir_recursive(&parser_src, &data.join("grammar/src"))?;
+    let parser_src_dir = source.join("grammar/src");
+    if parser_src_dir.exists() {
+        copy_dir_recursive(&parser_src_dir, &data.join("grammar/src"))?;
         println!("  ✓ Grammar source installed");
     }
 
-    // Copy pre-built parser if it exists
-    let parser_so = source.join("grammar/rune.so");
-    if parser_so.exists() {
-        fs::copy(&parser_so, data.join("parser/rune.so"))
-            .map_err(|e| format!("Failed to copy parser: {}", e))?;
-        println!("  ✓ Parser installed");
-    }
+    // Build tree-sitter parser
+    build_parser(&source, &data)?;
 
     println!();
 
@@ -120,6 +116,54 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
     println!();
     println!("Done!");
 
+    Ok(())
+}
+
+/// Build the tree-sitter parser from source
+fn build_parser(source: &PathBuf, data: &PathBuf) -> Result<(), String> {
+    let grammar_dir = source.join("grammar/src");
+    let parser_c = grammar_dir.join("parser.c");
+    let scanner_c = grammar_dir.join("scanner.c");
+
+    if !parser_c.exists() {
+        return Err("Grammar source not found. Cannot build parser.".to_string());
+    }
+
+    println!("Building parser...");
+
+    // Determine shared library flags based on OS
+    let (shared_flag, output_name) = if cfg!(target_os = "macos") {
+        ("-dynamiclib", "rune.so")
+    } else {
+        ("-shared", "rune.so")
+    };
+
+    let output_path = data.join("parser").join(output_name);
+
+    // Build with cc
+    let mut cmd = Command::new("cc");
+    cmd.arg(shared_flag)
+        .arg("-o")
+        .arg(&output_path)
+        .arg("-fPIC")
+        .arg("-O2")
+        .arg(&parser_c)
+        .arg("-I")
+        .arg(&grammar_dir);
+
+    // Add scanner.c if it exists
+    if scanner_c.exists() {
+        cmd.arg(&scanner_c);
+    }
+
+    let output = cmd.output().map_err(|e| format!("Failed to run cc: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to build parser: {}", stderr));
+    }
+
+    println!("  ✓ Parser built");
     Ok(())
 }
 
