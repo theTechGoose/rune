@@ -1,10 +1,38 @@
 //! Pure class code generation for ts-deno-native-class-validator-esm
 
 use crate::analyzer::{NounInfo, MethodInfo, TypeRef};
+use super::dto::generate_type_import;
+
+/// Collect custom type names referenced in a noun's methods and constructor
+fn collect_noun_custom_types(noun: &NounInfo) -> Vec<String> {
+    let mut types = Vec::new();
+    for param in &noun.constructor_param_infos {
+        if let TypeRef::Custom(name) = &param.type_ref {
+            types.push(name.clone());
+        }
+    }
+    for method in &noun.methods {
+        for param in &method.params {
+            if let TypeRef::Custom(name) = &param.type_ref {
+                types.push(name.clone());
+            }
+        }
+        if let TypeRef::Custom(name) = &method.return_type {
+            types.push(name.clone());
+        }
+    }
+    types
+}
 
 /// Generate pure class (no boundary methods)
-pub fn generate_pure_class_code(noun: &NounInfo) -> String {
+pub fn generate_pure_class_code(noun: &NounInfo, type_names: &[String]) -> String {
     let mut lines = Vec::new();
+
+    let custom_types = collect_noun_custom_types(noun);
+    if let Some(import) = generate_type_import(&custom_types, type_names, "../../dto/_shared.ts") {
+        lines.push(import);
+        lines.push(String::new());
+    }
 
     // Class definition
     lines.push(format!("export class {} {{", noun.pascal_name));
@@ -176,7 +204,7 @@ mod tests {
             ],
         };
 
-        let output = generate_pure_class_code(&noun);
+        let output = generate_pure_class_code(&noun, &[]);
 
         assert!(output.contains("export class Id"));
         assert!(output.contains("static create("));
@@ -199,7 +227,7 @@ mod tests {
             methods: vec![],
         };
 
-        let output = generate_pure_class_code(&noun);
+        let output = generate_pure_class_code(&noun, &[]);
 
         assert!(output.contains("constructor(private readonly config: config)"));
     }

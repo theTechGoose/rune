@@ -2,6 +2,20 @@
 
 use crate::analyzer::{PolyInfo, CaseInfo, TypeRef};
 
+/// Collect custom type names from a polymorphic definition
+fn collect_poly_custom_types(poly: &PolyInfo) -> Vec<String> {
+    let mut types = Vec::new();
+    for param in &poly.method_params {
+        if let TypeRef::Custom(name) = &param.type_ref {
+            types.push(name.clone());
+        }
+    }
+    if let TypeRef::Custom(name) = &poly.method_return_type {
+        types.push(name.clone());
+    }
+    types
+}
+
 /// Generate the main module file that exports base class and implementations
 pub fn generate_poly_mod(poly: &PolyInfo) -> String {
     let mut lines = Vec::new();
@@ -13,11 +27,23 @@ pub fn generate_poly_mod(poly: &PolyInfo) -> String {
 }
 
 /// Generate the abstract base class
-pub fn generate_poly_base_class(poly: &PolyInfo) -> String {
+pub fn generate_poly_base_class(poly: &PolyInfo, type_names: &[String]) -> String {
     let mut lines = Vec::new();
 
     // Imports
-    lines.push("import { validateDto } from \"../../dto/_shared.ts\";".to_string());
+    let custom_types = collect_poly_custom_types(poly);
+    let filtered: Vec<String> = custom_types.into_iter().filter(|t| type_names.contains(t)).collect();
+    if filtered.is_empty() {
+        lines.push("import { validateDto } from \"../../dto/_shared.ts\";".to_string());
+    } else {
+        let mut sorted = filtered;
+        sorted.sort();
+        sorted.dedup();
+        lines.push(format!(
+            "import {{ validateDto, {} }} from \"../../dto/_shared.ts\";",
+            sorted.join(", ")
+        ));
+    }
     lines.push(String::new());
 
     // Abstract class
@@ -63,12 +89,24 @@ pub fn generate_poly_implementations_mod(poly: &PolyInfo) -> String {
 }
 
 /// Generate a case implementation class
-pub fn generate_poly_case_class(poly: &PolyInfo, case: &CaseInfo) -> String {
+pub fn generate_poly_case_class(poly: &PolyInfo, case: &CaseInfo, type_names: &[String]) -> String {
     let mut lines = Vec::new();
 
     // Imports
     lines.push(format!("import {{ Base{} }} from \"../../shared/mod.ts\";", poly.pascal_name));
-    lines.push("import { validateDto } from \"../../../dto/_shared.ts\";".to_string());
+    let custom_types = collect_poly_custom_types(poly);
+    let filtered: Vec<String> = custom_types.into_iter().filter(|t| type_names.contains(t)).collect();
+    if filtered.is_empty() {
+        lines.push("import { validateDto } from \"../../../dto/_shared.ts\";".to_string());
+    } else {
+        let mut sorted = filtered;
+        sorted.sort();
+        sorted.dedup();
+        lines.push(format!(
+            "import {{ validateDto, {} }} from \"../../../dto/_shared.ts\";",
+            sorted.join(", ")
+        ));
+    }
     lines.push(String::new());
 
     // Class extends base
@@ -270,7 +308,7 @@ mod tests {
     #[test]
     fn generates_base_class() {
         let poly = make_test_poly();
-        let output = generate_poly_base_class(&poly);
+        let output = generate_poly_base_class(&poly, &[]);
 
         assert!(output.contains("export abstract class BaseProvider"));
         assert!(output.contains("abstract getRecording(externalId: string): Promise<Uint8Array>"));
@@ -289,7 +327,7 @@ mod tests {
     fn generates_case_class() {
         let poly = make_test_poly();
         let case = &poly.cases[0];
-        let output = generate_poly_case_class(&poly, case);
+        let output = generate_poly_case_class(&poly, case, &[]);
 
         assert!(output.contains("export class Genie extends BaseProvider"));
         assert!(output.contains("async getRecording(externalId: string): Promise<Uint8Array>"));

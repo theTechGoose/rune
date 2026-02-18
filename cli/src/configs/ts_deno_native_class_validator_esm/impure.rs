@@ -15,8 +15,29 @@ fn boundary_to_description(prefix: &str) -> &'static str {
     }
 }
 
+/// Collect custom type names referenced in a noun's methods and constructor
+fn collect_noun_custom_types(noun: &NounInfo) -> Vec<String> {
+    let mut types = Vec::new();
+    for param in &noun.constructor_param_infos {
+        if let TypeRef::Custom(name) = &param.type_ref {
+            types.push(name.clone());
+        }
+    }
+    for method in &noun.methods {
+        for param in &method.params {
+            if let TypeRef::Custom(name) = &param.type_ref {
+                types.push(name.clone());
+            }
+        }
+        if let TypeRef::Custom(name) = &method.return_type {
+            types.push(name.clone());
+        }
+    }
+    types
+}
+
 /// Generate impure class (has boundary methods)
-pub fn generate_impure_class_code(noun: &NounInfo) -> String {
+pub fn generate_impure_class_code(noun: &NounInfo, type_names: &[String]) -> String {
     let mut lines = Vec::new();
 
     // Boundary comment at top of file
@@ -30,8 +51,20 @@ pub fn generate_impure_class_code(noun: &NounInfo) -> String {
         lines.push(String::new());
     }
 
-    // Imports for validation
-    lines.push("import { validateDto } from \"../dto/_shared.ts\";".to_string());
+    // Imports for validation and types
+    let custom_types = collect_noun_custom_types(noun);
+    let filtered: Vec<String> = custom_types.into_iter().filter(|t| type_names.contains(t)).collect();
+    if filtered.is_empty() {
+        lines.push("import { validateDto } from \"../dto/_shared.ts\";".to_string());
+    } else {
+        let mut sorted = filtered;
+        sorted.sort();
+        sorted.dedup();
+        lines.push(format!(
+            "import {{ validateDto, {} }} from \"../dto/_shared.ts\";",
+            sorted.join(", ")
+        ));
+    }
     lines.push(String::new());
 
     // Class definition
@@ -239,7 +272,7 @@ mod tests {
             methods: vec![],
         };
 
-        let output = generate_impure_class_code(&noun);
+        let output = generate_impure_class_code(&noun, &[]);
 
         assert!(output.starts_with("// object storage and file system boundary"));
     }
@@ -270,7 +303,7 @@ mod tests {
             ],
         };
 
-        let output = generate_impure_class_code(&noun);
+        let output = generate_impure_class_code(&noun, &[]);
 
         assert!(output.contains("if (typeof id !== \"string\")"));
     }
@@ -301,7 +334,7 @@ mod tests {
             ],
         };
 
-        let output = generate_impure_class_code(&noun);
+        let output = generate_impure_class_code(&noun, &[]);
 
         assert!(output.contains("await validateDto(dto)"));
     }
@@ -327,7 +360,7 @@ mod tests {
             ],
         };
 
-        let output = generate_impure_class_code(&noun);
+        let output = generate_impure_class_code(&noun, &[]);
 
         assert!(output.contains("async save(): Promise<void>"));
     }

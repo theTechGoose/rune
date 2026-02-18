@@ -1,6 +1,6 @@
 //! Generator trait definition
 
-use crate::analyzer::{DtoInfo, NounInfo, ReqInfo, PolyInfo, CaseInfo};
+use crate::analyzer::{DtoInfo, NounInfo, ReqInfo, PolyInfo, CaseInfo, TypeInfo};
 
 /// Metadata about a configuration
 #[derive(Debug, Clone)]
@@ -18,34 +18,34 @@ pub trait Generator {
     fn config(&self) -> &ConfigMeta;
 
     /// Generate DTO class with validation
-    fn generate_dto(&self, dto: &DtoInfo) -> String;
+    fn generate_dto(&self, dto: &DtoInfo, type_names: &[String]) -> String;
 
     /// Generate pure class (no boundary methods)
-    fn generate_pure_class(&self, noun: &NounInfo) -> String;
+    fn generate_pure_class(&self, noun: &NounInfo, type_names: &[String]) -> String;
 
     /// Generate pure class tests
     fn generate_pure_test(&self, noun: &NounInfo) -> String;
 
     /// Generate impure class (has boundary methods)
-    fn generate_impure_class(&self, noun: &NounInfo) -> String;
+    fn generate_impure_class(&self, noun: &NounInfo, type_names: &[String]) -> String;
 
     /// Generate impure class tests
     fn generate_impure_test(&self, noun: &NounInfo) -> String;
 
     /// Generate integration code (outer + core functions)
-    fn generate_integration(&self, req: &ReqInfo) -> String;
+    fn generate_integration(&self, req: &ReqInfo, type_names: &[String]) -> String;
 
     /// Generate integration tests
     fn generate_integration_test(&self, req: &ReqInfo) -> String;
 
-    /// Generate shared utilities (like validateDto)
-    fn generate_shared(&self) -> String;
+    /// Generate shared utilities (like validateDto) and type aliases
+    fn generate_shared(&self, types: &[TypeInfo]) -> String;
 
     /// Generate polymorphic main module (exports base and implementations)
     fn generate_poly_mod(&self, poly: &PolyInfo) -> String;
 
     /// Generate polymorphic base class (abstract)
-    fn generate_poly_base_class(&self, poly: &PolyInfo) -> String;
+    fn generate_poly_base_class(&self, poly: &PolyInfo, type_names: &[String]) -> String;
 
     /// Generate polymorphic base class tests
     fn generate_poly_base_test(&self, poly: &PolyInfo) -> String;
@@ -54,7 +54,7 @@ pub trait Generator {
     fn generate_poly_implementations_mod(&self, poly: &PolyInfo) -> String;
 
     /// Generate polymorphic case implementation class
-    fn generate_poly_case_class(&self, poly: &PolyInfo, case: &CaseInfo) -> String;
+    fn generate_poly_case_class(&self, poly: &PolyInfo, case: &CaseInfo, type_names: &[String]) -> String;
 
     /// Generate polymorphic case implementation tests
     fn generate_poly_case_test(&self, poly: &PolyInfo, case: &CaseInfo) -> String;

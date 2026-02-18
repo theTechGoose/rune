@@ -6,7 +6,7 @@ mod pure;
 mod impure;
 mod polymorphic;
 
-use crate::analyzer::{DtoInfo, NounInfo, ReqInfo, PolyInfo, CaseInfo};
+use crate::analyzer::{DtoInfo, NounInfo, ReqInfo, PolyInfo, CaseInfo, TypeInfo};
 use crate::configs::{ConfigMeta, Generator};
 
 pub use integration::*;
@@ -45,44 +45,44 @@ impl Generator for TsDenoNativeClassValidatorEsm {
         &self.config
     }
 
-    fn generate_dto(&self, dto: &DtoInfo) -> String {
-        generate_dto_code(dto)
+    fn generate_dto(&self, dto: &DtoInfo, type_names: &[String]) -> String {
+        generate_dto_code(dto, type_names)
     }
 
-    fn generate_pure_class(&self, noun: &NounInfo) -> String {
-        generate_pure_class_code(noun)
+    fn generate_pure_class(&self, noun: &NounInfo, type_names: &[String]) -> String {
+        generate_pure_class_code(noun, type_names)
     }
 
     fn generate_pure_test(&self, noun: &NounInfo) -> String {
         generate_pure_test_code(noun)
     }
 
-    fn generate_impure_class(&self, noun: &NounInfo) -> String {
-        generate_impure_class_code(noun)
+    fn generate_impure_class(&self, noun: &NounInfo, type_names: &[String]) -> String {
+        generate_impure_class_code(noun, type_names)
     }
 
     fn generate_impure_test(&self, noun: &NounInfo) -> String {
         generate_impure_test_code(noun)
     }
 
-    fn generate_integration(&self, req: &ReqInfo) -> String {
-        generate_integration_code(req)
+    fn generate_integration(&self, req: &ReqInfo, type_names: &[String]) -> String {
+        generate_integration_code(req, type_names)
     }
 
     fn generate_integration_test(&self, req: &ReqInfo) -> String {
         generate_integration_test_code(req)
     }
 
-    fn generate_shared(&self) -> String {
-        generate_shared_code()
+    fn generate_shared(&self, types: &[TypeInfo]) -> String {
+        generate_shared_code(types)
     }
 
     fn generate_poly_mod(&self, poly: &PolyInfo) -> String {
         generate_poly_mod(poly)
     }
 
-    fn generate_poly_base_class(&self, poly: &PolyInfo) -> String {
-        generate_poly_base_class(poly)
+    fn generate_poly_base_class(&self, poly: &PolyInfo, type_names: &[String]) -> String {
+        generate_poly_base_class(poly, type_names)
     }
 
     fn generate_poly_base_test(&self, poly: &PolyInfo) -> String {
@@ -93,8 +93,8 @@ impl Generator for TsDenoNativeClassValidatorEsm {
         generate_poly_implementations_mod(poly)
     }
 
-    fn generate_poly_case_class(&self, poly: &PolyInfo, case: &CaseInfo) -> String {
-        generate_poly_case_class(poly, case)
+    fn generate_poly_case_class(&self, poly: &PolyInfo, case: &CaseInfo, type_names: &[String]) -> String {
+        generate_poly_case_class(poly, case, type_names)
     }
 
     fn generate_poly_case_test(&self, poly: &PolyInfo, case: &CaseInfo) -> String {

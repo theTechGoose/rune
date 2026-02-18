@@ -2,14 +2,37 @@
 
 use crate::analyzer::{ReqInfo, StepInfo, StepKind};
 
+/// Collect custom type names from integration core params
+fn collect_integration_custom_types(req: &ReqInfo) -> Vec<String> {
+    let mut types = Vec::new();
+    for step in &req.steps {
+        if step.boundary.is_some() && !step.output.is_empty() && step.output != "void" && !step.output.ends_with("Dto") {
+            types.push(step.output.clone());
+        }
+    }
+    types
+}
+
 /// Generate integration code (outer + core functions)
-pub fn generate_integration_code(req: &ReqInfo) -> String {
+pub fn generate_integration_code(req: &ReqInfo, type_names: &[String]) -> String {
     let mut lines = Vec::new();
 
     // Imports
     lines.push(format!("import {{ {} }} from \"../dto/{}.ts\";", req.input_dto, to_kebab(&req.input_dto)));
     lines.push(format!("import {{ {} }} from \"../dto/{}.ts\";", req.output_dto, to_kebab(&req.output_dto)));
-    lines.push("import { validateDto } from \"../dto/_shared.ts\";".to_string());
+    let custom_types = collect_integration_custom_types(req);
+    let filtered: Vec<String> = custom_types.into_iter().filter(|t| type_names.contains(t)).collect();
+    if filtered.is_empty() {
+        lines.push("import { validateDto } from \"../dto/_shared.ts\";".to_string());
+    } else {
+        let mut sorted = filtered;
+        sorted.sort();
+        sorted.dedup();
+        lines.push(format!(
+            "import {{ validateDto, {} }} from \"../dto/_shared.ts\";",
+            sorted.join(", ")
+        ));
+    }
     lines.push(String::new());
 
     // Core function (pure inner function - the seam)
@@ -90,7 +113,7 @@ pub fn generate_integration_test_code(req: &ReqInfo) -> String {
 
     let core_fn_name = format!("{}{}Core", req.verb, capitalize(&req.noun));
 
-    lines.push(format!("import {{ {} }} from \"./{}-{}.ts\";", core_fn_name, req.noun, req.verb));
+    lines.push(format!("import {{ {} }} from \"./{}-{}.ts\";", core_fn_name, req.verb, req.noun));
     lines.push("import { assertEquals, assertThrows } from \"@std/assert\";".to_string());
     lines.push(String::new());
 
@@ -247,7 +270,7 @@ mod tests {
     #[test]
     fn generates_integration_with_core_and_outer() {
         let req = make_test_req();
-        let output = generate_integration_code(&req);
+        let output = generate_integration_code(&req, &[]);
 
         assert!(output.contains("export function registerRecordingCore("));
         assert!(output.contains("export async function registerRecording("));
@@ -256,7 +279,7 @@ mod tests {
     #[test]
     fn generates_core_function_params() {
         let req = make_test_req();
-        let output = generate_integration_code(&req);
+        let output = generate_integration_code(&req, &[]);
 
         assert!(output.contains("input: GetRecordingDto"));
     }
@@ -264,7 +287,7 @@ mod tests {
     #[test]
     fn generates_dto_imports() {
         let req = make_test_req();
-        let output = generate_integration_code(&req);
+        let output = generate_integration_code(&req, &[]);
 
         assert!(output.contains("import { GetRecordingDto } from \"../dto/get-recording-dto.ts\""));
         assert!(output.contains("import { IdDto } from \"../dto/id-dto.ts\""));
