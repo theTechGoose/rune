@@ -1,0 +1,61 @@
+{
+  "name": "rune-lang",
+  "displayName": "Rune",
+  "description": "Language support for Rune requirement files",
+  "version": "0.1.0",
+  "publisher": "theTechGoose",
+  "repository": "https://github.com/theTechGoose/rune",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:rune"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "rune",
+        "aliases": ["Rune"],
+        "filenames": ["requirements"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rune",
+        "scopeName": "source.rune",
+        "path": "./syntaxes/rune.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Rune",
+      "properties": {
+        "rune.serverPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to rune LSP binary (defaults to ~/.local/bin/rune)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.22.0"
+  }
+}
