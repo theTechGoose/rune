@@ -129,6 +129,74 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             .map_err(|e| format!("Failed to write {}: {}", test_path.display(), e))?;
     }
 
+    // Generate polymorphic classes
+    for poly in &spec.polymorphics {
+        // Create polymorphic noun directory structure:
+        // <noun>/
+        //   mod.ts
+        //   shared/
+        //     mod.ts
+        //     test.ts
+        //   implementations/
+        //     mod.ts
+        //     <case>/
+        //       mod.ts
+        //       test.ts
+
+        let poly_dir = dist_dir.join("polymorphic").join(&poly.noun);
+        let shared_dir = poly_dir.join("shared");
+        let impl_dir = poly_dir.join("implementations");
+
+        // Create directories
+        fs::create_dir_all(&shared_dir)
+            .map_err(|e| format!("Failed to create polymorphic/{}/shared directory: {}", poly.noun, e))?;
+        fs::create_dir_all(&impl_dir)
+            .map_err(|e| format!("Failed to create polymorphic/{}/implementations directory: {}", poly.noun, e))?;
+
+        // Generate main module
+        let mod_content = generator.generate_poly_mod(poly);
+        let mod_path = poly_dir.join(format!("mod.{}", ext));
+        fs::write(&mod_path, mod_content)
+            .map_err(|e| format!("Failed to write {}: {}", mod_path.display(), e))?;
+
+        // Generate base class in shared/
+        let base_content = generator.generate_poly_base_class(poly);
+        let base_path = shared_dir.join(format!("mod.{}", ext));
+        fs::write(&base_path, base_content)
+            .map_err(|e| format!("Failed to write {}: {}", base_path.display(), e))?;
+
+        // Generate base tests in shared/
+        let base_test_content = generator.generate_poly_base_test(poly);
+        let base_test_path = shared_dir.join(format!("mod{}.{}", test_suffix, ext));
+        fs::write(&base_test_path, base_test_content)
+            .map_err(|e| format!("Failed to write {}: {}", base_test_path.display(), e))?;
+
+        // Generate implementations module
+        let impl_mod_content = generator.generate_poly_implementations_mod(poly);
+        let impl_mod_path = impl_dir.join(format!("mod.{}", ext));
+        fs::write(&impl_mod_path, impl_mod_content)
+            .map_err(|e| format!("Failed to write {}: {}", impl_mod_path.display(), e))?;
+
+        // Generate each case implementation
+        for case in &poly.cases {
+            let case_dir = impl_dir.join(&case.kebab_name);
+            fs::create_dir_all(&case_dir)
+                .map_err(|e| format!("Failed to create case directory {}: {}", case.kebab_name, e))?;
+
+            // Generate case class
+            let case_content = generator.generate_poly_case_class(poly, case);
+            let case_path = case_dir.join(format!("mod.{}", ext));
+            fs::write(&case_path, case_content)
+                .map_err(|e| format!("Failed to write {}: {}", case_path.display(), e))?;
+
+            // Generate case tests
+            let case_test_content = generator.generate_poly_case_test(poly, case);
+            let case_test_path = case_dir.join(format!("mod{}.{}", test_suffix, ext));
+            fs::write(&case_test_path, case_test_content)
+                .map_err(|e| format!("Failed to write {}: {}", case_test_path.display(), e))?;
+        }
+    }
+
     Ok(())
 }
 

@@ -4,14 +4,16 @@ mod integration;
 mod dto;
 mod pure;
 mod impure;
+mod polymorphic;
 
-use crate::analyzer::{DtoInfo, NounInfo, ReqInfo};
+use crate::analyzer::{DtoInfo, NounInfo, ReqInfo, PolyInfo, CaseInfo};
 use crate::configs::{ConfigMeta, Generator};
 
 pub use integration::*;
 pub use dto::*;
 pub use pure::*;
 pub use impure::*;
+pub use polymorphic::*;
 
 /// Generator for ts-deno-native-class-validator-esm configuration
 pub struct TsDenoNativeClassValidatorEsm {
@@ -73,6 +75,30 @@ impl Generator for TsDenoNativeClassValidatorEsm {
 
     fn generate_shared(&self) -> String {
         generate_shared_code()
+    }
+
+    fn generate_poly_mod(&self, poly: &PolyInfo) -> String {
+        generate_poly_mod(poly)
+    }
+
+    fn generate_poly_base_class(&self, poly: &PolyInfo) -> String {
+        generate_poly_base_class(poly)
+    }
+
+    fn generate_poly_base_test(&self, poly: &PolyInfo) -> String {
+        generate_poly_base_test(poly)
+    }
+
+    fn generate_poly_implementations_mod(&self, poly: &PolyInfo) -> String {
+        generate_poly_implementations_mod(poly)
+    }
+
+    fn generate_poly_case_class(&self, poly: &PolyInfo, case: &CaseInfo) -> String {
+        generate_poly_case_class(poly, case)
+    }
+
+    fn generate_poly_case_test(&self, poly: &PolyInfo, case: &CaseInfo) -> String {
+        generate_poly_case_test(poly, case)
     }
 }
 

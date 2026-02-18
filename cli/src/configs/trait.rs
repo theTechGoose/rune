@@ -1,6 +1,6 @@
 //! Generator trait definition
 
-use crate::analyzer::{DtoInfo, NounInfo, ReqInfo};
+use crate::analyzer::{DtoInfo, NounInfo, ReqInfo, PolyInfo, CaseInfo};
 
 /// Metadata about a configuration
 #[derive(Debug, Clone)]
@@ -40,6 +40,24 @@ pub trait Generator {
 
     /// Generate shared utilities (like validateDto)
     fn generate_shared(&self) -> String;
+
+    /// Generate polymorphic main module (exports base and implementations)
+    fn generate_poly_mod(&self, poly: &PolyInfo) -> String;
+
+    /// Generate polymorphic base class (abstract)
+    fn generate_poly_base_class(&self, poly: &PolyInfo) -> String;
+
+    /// Generate polymorphic base class tests
+    fn generate_poly_base_test(&self, poly: &PolyInfo) -> String;
+
+    /// Generate polymorphic implementations module (re-exports all cases)
+    fn generate_poly_implementations_mod(&self, poly: &PolyInfo) -> String;
+
+    /// Generate polymorphic case implementation class
+    fn generate_poly_case_class(&self, poly: &PolyInfo, case: &CaseInfo) -> String;
+
+    /// Generate polymorphic case implementation tests
+    fn generate_poly_case_test(&self, poly: &PolyInfo, case: &CaseInfo) -> String;
 }
 
 #[cfg(test)]

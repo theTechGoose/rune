@@ -6,6 +6,7 @@ mod dtos;
 mod types;
 mod faults;
 mod requirements;
+mod polymorphic;
 
 pub use nouns::{NounInfo, to_pascal_case, extract_nouns, extract_nouns_with_types};
 pub use methods::*;
@@ -13,6 +14,7 @@ pub use dtos::*;
 pub use types::*;
 pub use faults::*;
 pub use requirements::*;
+pub use polymorphic::*;
 
 use rune_parser::parse_document;
 
@@ -23,6 +25,7 @@ pub struct AnalyzedSpec {
     pub types: Vec<TypeInfo>,
     pub nouns: Vec<NounInfo>,
     pub requirements: Vec<ReqInfo>,
+    pub polymorphics: Vec<PolyInfo>,
 }
 
 /// Analyze a rune document and extract semantic information
@@ -34,12 +37,14 @@ pub fn analyze(text: &str) -> AnalyzedSpec {
     let requirements = extract_requirements(&lines);
     // Pass types to noun extraction for type resolution
     let nouns = extract_nouns_with_types(&lines, &types);
+    let polymorphics = extract_polymorphic_with_types(&lines, &types);
 
     AnalyzedSpec {
         dtos,
         types,
         nouns,
         requirements,
+        polymorphics,
     }
 }
 
