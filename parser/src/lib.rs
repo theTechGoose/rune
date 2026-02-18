@@ -15,6 +15,7 @@ pub enum LineKind {
         input: String,
         output: String,
         indent: usize,
+        is_camel_case: bool,
     },
     Step {
         noun: String,
@@ -175,8 +176,8 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
             in_dto_block = false;
             in_typ_block = false;
             in_non_block = false;
-            if let Some((noun, verb, input, output)) = parse_req_signature(&trimmed[5..]) {
-                results.push(ParsedLine { line_num, kind: LineKind::Req { noun, verb, input, output, indent: actual_indent } });
+            if let Some((noun, verb, input, output, is_camel_case)) = parse_req_signature(&trimmed[5..]) {
+                results.push(ParsedLine { line_num, kind: LineKind::Req { noun, verb, input, output, indent: actual_indent, is_camel_case } });
             } else {
                 results.push(ParsedLine { line_num, kind: LineKind::Unknown("[REQ] missing signature".to_string()) });
             }
@@ -494,7 +495,7 @@ fn parse_signature(s: &str) -> Option<(String, String, Vec<String>, String, bool
     Some((noun, verb, params, output, is_static))
 }
 
-fn parse_req_signature(s: &str) -> Option<(String, String, String, String)> {
+fn parse_req_signature(s: &str) -> Option<(String, String, String, String, bool)> {
     let s = s.trim();
     let paren_open = s.find('(')?;
     let paren_close = s.find(')')?;
@@ -509,14 +510,14 @@ fn parse_req_signature(s: &str) -> Option<(String, String, String, String)> {
 
     // Find separator: either :: (static) or . (instance)
     let name_part = &s[..paren_open];
-    let (noun, verb) = if let Some(pos) = name_part.find("::") {
+    let (noun, verb, is_camel_case) = if let Some(pos) = name_part.find("::") {
         let noun = name_part[..pos].trim().to_string();
         let verb = name_part[pos + 2..].trim().to_string();
-        (noun, verb)
+        (noun, verb, false)
     } else if let Some(pos) = name_part.find('.') {
         let noun = name_part[..pos].trim().to_string();
         let verb = name_part[pos + 1..].trim().to_string();
-        (noun, verb)
+        (noun, verb, false)
     } else {
         // camelCase format: verbNoun -> split at first uppercase after start
         let name = name_part.trim();
@@ -528,7 +529,7 @@ fn parse_req_signature(s: &str) -> Option<(String, String, String, String)> {
             let noun = noun_part.chars().next()
                 .map(|c| c.to_lowercase().to_string() + &noun_part[c.len_utf8()..])
                 .unwrap_or_default();
-            (noun, verb)
+            (noun, verb, true)
         } else {
             return None;
         }
@@ -538,7 +539,7 @@ fn parse_req_signature(s: &str) -> Option<(String, String, String, String)> {
         return None;
     }
 
-    Some((noun, verb, input, output))
+    Some((noun, verb, input, output, is_camel_case))
 }
 
 fn parse_partial_signature(s: &str) -> Option<(String, String, Vec<String>, String, bool)> {

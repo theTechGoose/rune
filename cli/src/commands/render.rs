@@ -319,13 +319,22 @@ fn highlight_line(line: &str, kind: Option<&LineKind>, defs: &HashMap<String, (u
     let indent_str = "&nbsp;".repeat(indent);
 
     match kind {
-        Some(LineKind::Req { noun, verb, input, output, .. }) => {
+        Some(LineKind::Req { noun, verb, input, output, is_camel_case, .. }) => {
             let input_html = dto_link(input, defs);
             let output_html = dto_link(output, defs);
-            format!(
-                r#"{}<span class="rune-tag">[REQ]</span> {}<span class="rune-punct">.</span>{}<span class="rune-punct">(</span>{}<span class="rune-punct">):</span> {}"#,
-                indent_str, noun_span(noun, defs), verb_span(noun, verb, defs), input_html, output_html
-            )
+            if *is_camel_case {
+                // Render as camelCase: verbNoun(input): output
+                let func_name = format!("{}{}", verb, capitalize_first(noun));
+                format!(
+                    r#"{}<span class="rune-tag">[REQ]</span> <span class="rune-boundary">{}</span><span class="rune-punct">(</span>{}<span class="rune-punct">):</span> {}"#,
+                    indent_str, html_escape(&func_name), input_html, output_html
+                )
+            } else {
+                format!(
+                    r#"{}<span class="rune-tag">[REQ]</span> {}<span class="rune-punct">.</span>{}<span class="rune-punct">(</span>{}<span class="rune-punct">):</span> {}"#,
+                    indent_str, noun_span(noun, defs), verb_span(noun, verb, defs), input_html, output_html
+                )
+            }
         }
         Some(LineKind::Step { noun, verb, params, output, is_static, .. }) => {
             let sep = if *is_static { "::" } else { "." };
@@ -532,4 +541,12 @@ fn html_escape(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+fn capitalize_first(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().to_string() + chars.as_str(),
+        None => String::new(),
+    }
 }
