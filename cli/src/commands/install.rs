@@ -51,18 +51,52 @@ fn data_dir() -> PathBuf {
         })
 }
 
+/// Get the rune binary directory
+fn bin_dir() -> PathBuf {
+    env::var("RUNE_BIN")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".local/bin")
+        })
+}
+
+/// Find the rune source directory by walking up from cwd
+fn find_source_dir() -> Option<PathBuf> {
+    let mut dir = env::current_dir().ok()?;
+    loop {
+        // Check if this looks like the rune repo
+        let cargo_toml = dir.join("Cargo.toml");
+        let lsp_dir = dir.join("lsp");
+        if cargo_toml.exists() && lsp_dir.exists() {
+            // Verify it's actually the rune repo by checking for lsp/Cargo.toml
+            if lsp_dir.join("Cargo.toml").exists() {
+                return Some(dir);
+            }
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    None
+}
+
 /// Install Rune components
 pub fn install(editor: Option<Editor>) -> Result<(), String> {
     let data = data_dir();
+    let bin = bin_dir();
 
     println!("Installing Rune...");
     println!("  Data: {}", data.display());
+    println!("  Bin:  {}", bin.display());
     println!();
 
-    // Create data directories
+    // Create directories
     fs::create_dir_all(&data).map_err(|e| format!("Failed to create data dir: {}", e))?;
     fs::create_dir_all(data.join("parser")).map_err(|e| format!("Failed to create parser dir: {}", e))?;
     fs::create_dir_all(data.join("queries")).map_err(|e| format!("Failed to create queries dir: {}", e))?;
+    fs::create_dir_all(&bin).map_err(|e| format!("Failed to create bin dir: {}", e))?;
 
     // Write embedded queries
     fs::write(data.join("queries/highlights.scm"), HIGHLIGHTS_SCM)
@@ -71,6 +105,9 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
 
     // Build tree-sitter parser from embedded sources
     build_parser(&data)?;
+
+    // Build and install LSP
+    build_lsp(&bin)?;
 
     println!();
 
@@ -142,6 +179,39 @@ fn build_parser(data: &PathBuf) -> Result<(), String> {
     }
 
     println!("  ✓ Parser built");
+    Ok(())
+}
+
+/// Build and install the LSP from source
+fn build_lsp(bin_dir: &PathBuf) -> Result<(), String> {
+    let source_dir = find_source_dir()
+        .ok_or("Could not find rune source directory. Run from within the rune repo.")?;
+
+    println!("Building LSP...");
+
+    // Build with cargo
+    let output = Command::new("cargo")
+        .arg("build")
+        .arg("-p")
+        .arg("rune-lsp")
+        .arg("--release")
+        .arg("--quiet")
+        .current_dir(&source_dir)
+        .output()
+        .map_err(|e| format!("Failed to run cargo: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to build LSP: {}", stderr));
+    }
+
+    // Copy binary to bin directory
+    let lsp_binary = source_dir.join("target/release/rune-lsp");
+    let dest = bin_dir.join("rune-lsp");
+    fs::copy(&lsp_binary, &dest)
+        .map_err(|e| format!("Failed to install LSP binary: {}", e))?;
+
+    println!("  ✓ LSP installed");
     Ok(())
 }
 
