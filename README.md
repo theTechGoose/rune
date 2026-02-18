@@ -19,12 +19,17 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 ## Install
 
 ```bash
+# Prerequisites:
 # macOS:   xcode-select --install
 # Linux:   apt install build-essential (or dnf install gcc)
 # Windows: use WSL, then follow Linux instructions
 # Rust:    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
+git clone https://github.com/theTechGoose/rune.git
+cd rune
+./install-cli
+rune install -e neovim      # or helix, vscode, zed, sublime, emacs
+rune install --shell zsh    # optional: shell completions
 ```
 
 ## Features
@@ -57,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh |
 
 ## Editors
 
-The install script supports:
+Supported editors:
 
 - Neovim
 - Helix
@@ -66,7 +71,10 @@ The install script supports:
 - Sublime Text
 - Emacs
 
-Run `./install.sh` and select your editor, or run individual scripts from `editors/`.
+```bash
+rune install -e <editor>    # set up editor integration
+rune uninstall -e <editor>  # remove editor integration
+```
 
 ## License
 
