@@ -92,7 +92,7 @@ fn find_source_dir() -> Option<PathBuf> {
 }
 
 /// Install Rune components with interactive prompts
-pub fn install() -> Result<(), String> {
+pub fn install(yes: bool) -> Result<(), String> {
     let data = data_dir();
     let bin = bin_dir();
 
@@ -120,21 +120,25 @@ pub fn install() -> Result<(), String> {
 
     println!();
 
-    // Interactive prompts
-    let editors = prompt_editors()?;
+    // Editor, shell, and icon setup
+    let (editors, shell, icons) = if yes {
+        (vec![Editor::Neovim], Some("zsh".to_string()), IconTargets { yazi: true, ..Default::default() })
+    } else {
+        (prompt_editors()?, prompt_shell()?, prompt_icons()?)
+    };
+
     for editor in editors {
         setup_editor(editor, &data)?;
     }
 
     println!();
 
-    if let Some(shell) = prompt_shell()? {
+    if let Some(shell) = shell {
         setup_shell_completions(&shell)?;
     }
 
     println!();
 
-    let icons = prompt_icons()?;
     if icons.yazi { setup_yazi_icons()?; }
     if icons.lf { setup_lf_icons()?; }
     if icons.eza { setup_eza_icons()?; }
@@ -535,12 +539,17 @@ fn setup_neovim(data_dir: &PathBuf) -> Result<(), String> {
 "#).map_err(|e| format!("Failed to write ftdetect: {}", e))?;
     println!("  ✓ Filetype detection configured");
 
-    // Create ftplugin with highlights and LSP
+    // Create ftplugin with highlights and LSP (wrapped in pcall for safety)
     let ftplugin_dir = nvim_config.join("after/ftplugin");
     fs::create_dir_all(&ftplugin_dir).map_err(|e| format!("Failed to create ftplugin dir: {}", e))?;
     fs::write(ftplugin_dir.join("rune.lua"), r##"-- Register and start tree-sitter parser
-vim.treesitter.language.register("rune", "rune")
-vim.treesitter.start()
+local ok, err = pcall(function()
+  vim.treesitter.language.register("rune", "rune")
+  vim.treesitter.start()
+end)
+if not ok then
+  vim.notify("Rune treesitter error: " .. tostring(err), vim.log.levels.WARN)
+end
 
 -- Mesa Vapor palette highlights
 vim.api.nvim_set_hl(0, "@rune.tag", { fg = "#89babf" })      -- muted teal
@@ -553,11 +562,16 @@ vim.api.nvim_set_hl(0, "@rune.fault", { fg = "#c9826a" })    -- terracotta
 vim.api.nvim_set_hl(0, "@rune.comment", { fg = "#7a7070" })  -- warm gray
 
 -- Start Rune LSP
-vim.lsp.start({
-  name = "rune",
-  cmd = { vim.fn.expand("~/.local/bin/rune-lsp") },
-  root_dir = vim.fn.getcwd(),
-})
+local lsp_ok, lsp_err = pcall(function()
+  vim.lsp.start({
+    name = "rune",
+    cmd = { vim.fn.expand("~/.local/bin/rune-lsp") },
+    root_dir = vim.fn.getcwd(),
+  })
+end)
+if not lsp_ok then
+  vim.notify("Rune LSP error: " .. tostring(lsp_err), vim.log.levels.WARN)
+end
 "##).map_err(|e| format!("Failed to write ftplugin: {}", e))?;
     println!("  ✓ LSP and highlights configured");
 
@@ -633,37 +647,48 @@ const RUNE_END: &str = "# END RUNE CONFIG";
 fn setup_yazi_icons() -> Result<(), String> {
     println!("Setting up yazi icons...");
 
-    let config_dir = dirs::config_dir()
-        .ok_or("Could not find config directory")?
-        .join("yazi");
+    // yazi uses XDG config (~/.config/yazi) on all platforms
+    let config_dir = dirs::home_dir()
+        .ok_or("Could not find home directory")?
+        .join(".config/yazi");
     fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create yazi config dir: {}", e))?;
 
-    // Write standalone rune icon config
-    let rune_config = config_dir.join("rune.toml");
-    fs::write(&rune_config, r#"# Rune file icon - sourced by theme.toml
-[[icon.rules]]
-name = "*.rune"
-text = "ᚱ"
-"#).map_err(|e| format!("Failed to write rune.toml: {}", e))?;
-
-    // Check if theme.toml exists and add prepend_rules if needed
     let theme_path = config_dir.join("theme.toml");
-    let prepend_line = format!("{}\nprepend_rules = \"~/.config/yazi/rune.toml\"\n{}\n", RUNE_BEGIN, RUNE_END);
+    let rune_icon = r##"{ name = "rune", text = "ᚱ", fg = "#89babf" }"##;
 
     if theme_path.exists() {
         let content = fs::read_to_string(&theme_path)
             .map_err(|e| format!("Failed to read theme.toml: {}", e))?;
-        if !content.contains("rune.toml") {
-            // Append to existing theme.toml
-            let new_content = format!("{}\n\n[icon]\n{}", content.trim_end(), prepend_line);
+
+        if content.contains(r#"name = "rune""#) {
+            println!("  ✓ Rune icon already configured");
+        } else if content.contains("prepend_exts") {
+            // Add to existing prepend_exts array
+            let new_content = content.replace(
+                "prepend_exts = [",
+                &format!("prepend_exts = [\n  {},", rune_icon)
+            );
+            fs::write(&theme_path, new_content)
+                .map_err(|e| format!("Failed to update theme.toml: {}", e))?;
+            println!("  ✓ Added rune icon to existing prepend_exts");
+        } else if content.contains("[icon]") {
+            // Add prepend_exts to existing [icon] section
+            let new_content = content.replace(
+                "[icon]",
+                &format!("[icon]\nprepend_exts = [\n  {}\n]", rune_icon)
+            );
             fs::write(&theme_path, new_content)
                 .map_err(|e| format!("Failed to update theme.toml: {}", e))?;
             println!("  ✓ Added rune icon to theme.toml");
         } else {
-            println!("  ✓ Rune icon already configured");
+            // Append new [icon] section
+            let new_content = format!("{}\n\n[icon]\nprepend_exts = [\n  {}\n]", content.trim_end(), rune_icon);
+            fs::write(&theme_path, new_content)
+                .map_err(|e| format!("Failed to update theme.toml: {}", e))?;
+            println!("  ✓ Added rune icon to theme.toml");
         }
     } else {
-        fs::write(&theme_path, format!("[icon]\n{}", prepend_line))
+        fs::write(&theme_path, format!("[icon]\nprepend_exts = [\n  {}\n]\n", rune_icon))
             .map_err(|e| format!("Failed to create theme.toml: {}", e))?;
         println!("  ✓ Created theme.toml with rune icon");
     }
