@@ -259,7 +259,7 @@ Inline comments use `//` syntax:
 
 ## File Conventions
 
-- File named `requirements` (no extension)
+- File extension: `.rune`
 - Maximum 80 characters per line
 - Indentation: 4 spaces for steps, 6 spaces for faults
 - No blank lines between steps; double blank line between requirements
@@ -346,7 +346,7 @@ All keyword tags are exactly 3 letters inside brackets (`[XXX]`). This ensures c
 
 ## Traced Example
 
-See `./requirements` for a complete example demonstrating:
+See `./example.rune` for a complete example demonstrating:
 
 - REQ lines with DTO inputs and outputs
 - Steps with boundary prefixes (`ex:`, `db:`, `os:`)

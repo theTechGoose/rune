@@ -1,6 +1,6 @@
 # Syntax Highlighting
 
-Editor syntax highlighting for `rune` files.
+Editor syntax highlighting for `.rune` files.
 
 ## Philosophy
 
@@ -8,70 +8,51 @@ DuoTone-inspired minimal highlighting. Only highlight what matters:
 
 > "If everything is highlighted, nothing stands out."
 
-Most code should be default text color. Only structural elements and
+Most code uses default text color. Only structural elements and
 semantically important nodes get color treatment.
 
-## Color Scheme
+## Mesa Vapor Palette
 
-| Hex       | Name     | Capture                  | Elements                               |
-| --------- | -------- | ------------------------ | -------------------------------------- |
-| `#f9e2af` | Yellow   | `@define`                | Tags: `[REQ]`, `[DTO]`, `[TYP]`, etc.  |
-| `#89b4fa` | Blue     | `@type`                  | DTO refs, type names, builtins         |
-| `#f38ba8` | Red      | `@error`                 | Faults (`not-found`, `timed-out`)      |
-| `#fab387` | Peach    | `@attribute`             | Boundary prefixes (`db:`, `ex:`, etc.) |
-| `#6c7086` | Overlay0 | `@comment`               | Comments, descriptions                 |
-| `#585b70` | Surface2 | `@punctuation.delimiter` | Brackets `{}[]<>`                      |
-| —         | Default  | (none)                   | Nouns, verbs, params, properties       |
+| Capture          | Color       | Hex       |
+| ---------------- | ----------- | --------- |
+| `@rune.tag`      | muted teal  | `#89babf` |
+| `@rune.noun`     | sage        | `#8a9e7a` |
+| `@rune.verb`     | dusty mauve | `#9e8080` |
+| `@rune.dto`      | moss        | `#8fb86e` |
+| `@rune.builtin`  | cream       | `#eeeeee` |
+| `@rune.boundary` | rosewood    | `#b38585` |
+| `@rune.fault`    | terracotta  | `#c9826a` |
+| `@rune.comment`  | warm gray   | `#7a7070` |
 
-Based on [Catppuccin Mocha](https://catppuccin.com/palette/).
-
-**Design principles:**
-
-- **4 accent colors** for semantically distinct categories
-- **Default text** for everything else (nouns, verbs, params)
-- **Muted brackets** that fade into background
-
-## Tree-sitter Parser
+## Tree-sitter Captures
 
 ### Highlighted Node Types
 
-Only these node types receive color highlighting:
-
-| Node type          | Capture      | Color    | Purpose         |
-| ------------------ | ------------ | -------- | --------------- |
-| `req_tag`          | `@define`    | yellow   | structural tag  |
-| `dto_tag`          | `@define`    | yellow   | structural tag  |
-| `typ_tag`          | `@define`    | yellow   | structural tag  |
-| `ply_tag`          | `@define`    | yellow   | structural tag  |
-| `cse_tag`          | `@define`    | yellow   | structural tag  |
-| `ctr_tag`          | `@define`    | yellow   | structural tag  |
-| `ret_tag`          | `@define`    | yellow   | structural tag  |
-| `dto_reference`    | `@type`      | blue     | type reference  |
-| `dto_def_name`     | `@type`      | blue     | type definition |
-| `typ_type`         | `@type`      | blue     | type annotation |
-| `typ_generic_type` | `@type`      | blue     | generic type    |
-| `typ_tuple_type`   | `@type`      | blue     | tuple type      |
-| `fault_name`       | `@error`     | red      | error condition |
-| `boundary_prefix`  | `@attribute` | peach    | system boundary |
-| `typ_desc`         | `@comment`   | overlay0 | description     |
-| `dto_desc`         | `@comment`   | overlay0 | description     |
-| `comment`          | `@comment`   | overlay0 | inline comment  |
-
-### Unhighlighted Node Types
-
-These nodes use the editor's default foreground color:
-
-- `identifier` — nouns (`recording`, `id`, `provider`)
-- `method_name` — verbs (`create`, `set`, `get`)
-- `param_name` — parameters inside `()`
-- `type_name` — return type identifiers
-- `property_name` — properties inside `{}`
-- `dto_prop`, `dto_array_prop`, `dto_array_suffix` — DTO properties
-- `typ_name` — TYP name before `:`
+| Node type          | Capture          | Purpose                |
+| ------------------ | ---------------- | ---------------------- |
+| `req_tag`          | `@rune.tag`      | `[REQ]` tag            |
+| `dto_tag`          | `@rune.tag`      | `[DTO]` tag            |
+| `typ_tag`          | `@rune.tag`      | `[TYP]` tag            |
+| `ply_tag`          | `@rune.tag`      | `[PLY]` tag            |
+| `cse_tag`          | `@rune.tag`      | `[CSE]` tag            |
+| `ctr_tag`          | `@rune.tag`      | `[CTR]` tag            |
+| `ret_tag`          | `@rune.tag`      | `[RET]` tag            |
+| `identifier`       | `@rune.noun`     | nouns (in signatures)  |
+| `method_name`      | `@rune.verb`     | verbs                  |
+| `dto_reference`    | `@rune.dto`      | DTO references         |
+| `dto_def_name`     | `@rune.dto`      | DTO definitions        |
+| `typ_type`         | `@rune.builtin`  | type annotations       |
+| `typ_generic_type` | `@rune.builtin`  | generic types          |
+| `typ_tuple_type`   | `@rune.builtin`  | tuple types            |
+| `boundary_prefix`  | `@rune.boundary` | `db:`, `ex:`, etc.     |
+| `fault_name`       | `@rune.fault`    | error conditions       |
+| `typ_desc`         | `@rune.comment`  | type descriptions      |
+| `dto_desc`         | `@rune.comment`  | DTO descriptions       |
+| `comment`          | `@rune.comment`  | inline comments        |
 
 ### Punctuation
 
-Brackets are muted (`@punctuation.delimiter`):
+Brackets use `@rune.comment` (muted):
 
 - `{` `}` in inline DTOs
 - `[` `]` in array types and tuples
@@ -79,30 +60,29 @@ Brackets are muted (`@punctuation.delimiter`):
 
 ### Expected AST
 
-Based on `./requirements`. Colored elements shown with arrows; unlabeled
-nodes use default text color.
+Based on `./example.rune`. Captures shown with arrows.
 
-Line 1: `[REQ] recording.register(GetRecordingDto): IdDto`
+Line: `[REQ] recording.register(GetRecordingDto): IdDto`
 
 ```
 req_line
-├── req_tag "[REQ]"                          → yellow (@define)
+├── req_tag "[REQ]"                          → @rune.tag
 ├── signature
-│   ├── identifier "recording"               (default)
-│   └── method_name "register"               (default)
+│   ├── identifier "recording"               → @rune.noun
+│   └── method_name "register"               → @rune.verb
 ├── parameters
-│   └── dto_reference "GetRecordingDto"      → blue (@type)
+│   └── dto_reference "GetRecordingDto"      → @rune.dto
 └── return_type
-    └── dto_reference "IdDto"                → blue (@type)
+    └── dto_reference "IdDto"                → @rune.dto
 ```
 
-Line 2: `    id::create(providerName, externalId): id`
+Line: `    id::create(providerName, externalId): id`
 
 ```
 step_line
 ├── signature
-│   ├── identifier "id"                      (default)
-│   └── method_name "create"                 (default)
+│   ├── identifier "id"                      → @rune.noun
+│   └── method_name "create"                 → @rune.verb
 ├── parameters
 │   ├── param_name "providerName"            (default)
 │   └── param_name "externalId"              (default)
@@ -110,77 +90,44 @@ step_line
     └── type_name "id"                       (default)
 ```
 
-Line 3: `      not-valid-provider`
+Line: `      not-found timed-out`
 
 ```
 fault_line
-└── fault_name "not-valid-provider"          → red (@error)
+├── fault_name "not-found"                   → @rune.fault
+└── fault_name "timed-out"                   → @rune.fault
 ```
 
-Line 6: `    [PLY] provider.getRecording(externalId): data`
-
-```
-ply_step
-├── ply_tag "[PLY]"                          → yellow (@define)
-├── signature
-│   ├── identifier "provider"                (default)
-│   └── method_name "getRecording"           (default)
-├── parameters
-│   └── param_name "externalId"              (default)
-└── return_type
-    └── type_name "data"                     (default)
-```
-
-Line 8: `        ex:provider.search(externalId): SearchDto`
+Line: `    ex:provider.search(externalId): SearchDto`
 
 ```
 boundary_line
-├── boundary_prefix "ex:"                    → peach (@attribute)
+├── boundary_prefix "ex:"                    → @rune.boundary
 ├── signature
-│   ├── identifier "provider"                (default)
-│   └── method_name "search"                 (default)
+│   ├── identifier "provider"                → @rune.noun
+│   └── method_name "search"                 → @rune.verb
 ├── parameters
 │   └── param_name "externalId"              (default)
 └── return_type
-    └── dto_reference "SearchDto"            → blue (@type)
+    └── dto_reference "SearchDto"            → @rune.dto
 ```
 
-Line 17: `    [CTR] metadata`
-
-```
-ctr_step
-├── ctr_tag "[CTR]"                          → yellow (@define)
-└── identifier "metadata"                    (default)
-```
-
-Lines 53-54: Type definition with description
-
-```
-[TYP] storage: Class
-    a class representing the storage system...
-```
+Line: `[TYP] storage: Class`
 
 ```
 typ_definition
-├── typ_tag "[TYP]"                          → yellow (@define)
+├── typ_tag "[TYP]"                          → @rune.tag
 ├── typ_name "storage"                       (default)
-├── typ_type
-│   └── type_name "Class"                    → blue (@type)
-└── typ_desc "a class representing..."       → overlay0 (@comment)
+└── typ_type
+    └── type_name "Class"                    → @rune.builtin
 ```
 
-Lines 79-80: DTO definition
-
-```
-[DTO] SearchDto: url(s)
-    a list of URLs returned by provider search
-```
+Line: `[DTO] SearchDto: url(s)`
 
 ```
 dto_definition
-├── dto_tag "[DTO]"                          → yellow (@define)
-├── dto_def_name "SearchDto"                 → blue (@type)
+├── dto_tag "[DTO]"                          → @rune.tag
+├── dto_def_name "SearchDto"                 → @rune.dto
 ├── dto_array_prop "url"                     (default)
-├── dto_array_suffix "(s)"                   (default)
-└── dto_desc "a list of URLs..."             → overlay0 (@comment)
+└── dto_array_suffix "(s)"                   (default)
 ```
