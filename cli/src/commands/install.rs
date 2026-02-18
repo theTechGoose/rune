@@ -348,55 +348,59 @@ fn build_lsp(bin_dir: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-/// Set up shell completions by adding to shell config file
+/// Set up shell completions by writing completion file and updating shell config
 fn setup_shell_completions(shell: &str) -> Result<(), String> {
     let home = dirs::home_dir().ok_or("Could not find home directory")?;
 
-    let (config_file, completion_line) = match shell {
-        "zsh" => (
-            home.join(".zshrc"),
-            r#"eval "$(rune completions zsh)""#,
-        ),
-        "bash" => (
-            home.join(".bashrc"),
-            r#"eval "$(rune completions bash)""#,
-        ),
-        "fish" => (
-            home.join(".config/fish/config.fish"),
-            "rune completions fish | source",
-        ),
-        _ => return Err(format!("Unsupported shell: {}", shell)),
-    };
+    // Generate completion script
+    let completion_script = Command::new("rune")
+        .arg("completions")
+        .arg(shell)
+        .output()
+        .map_err(|e| format!("Failed to generate completions: {}", e))?;
 
-    // Check if already configured
-    if config_file.exists() {
-        let content = fs::read_to_string(&config_file)
-            .map_err(|e| format!("Failed to read {}: {}", config_file.display(), e))?;
-        if content.contains("rune completions") {
-            println!("  ✓ Shell completions already configured");
-            return Ok(());
+    if !completion_script.status.success() {
+        return Err("Failed to generate completion script".to_string());
+    }
+
+    let script = String::from_utf8_lossy(&completion_script.stdout);
+
+    match shell {
+        "zsh" => {
+            // Write completion file
+            let comp_dir = home.join(".zsh/completions");
+            fs::create_dir_all(&comp_dir)
+                .map_err(|e| format!("Failed to create completions dir: {}", e))?;
+            fs::write(comp_dir.join("_rune"), script.as_ref())
+                .map_err(|e| format!("Failed to write completion file: {}", e))?;
+
+            println!("  ✓ Completions installed to ~/.zsh/completions/_rune");
+            println!("    Add to .zshrc: fpath=(~/.zsh/completions $fpath)");
+            println!("    Then run: rm -f ~/.zcompdump* && exec zsh");
         }
+        "bash" => {
+            // Write completion file
+            let comp_dir = home.join(".local/share/bash-completion/completions");
+            fs::create_dir_all(&comp_dir)
+                .map_err(|e| format!("Failed to create completions dir: {}", e))?;
+            fs::write(comp_dir.join("rune"), script.as_ref())
+                .map_err(|e| format!("Failed to write completion file: {}", e))?;
+
+            println!("  ✓ Completions installed to ~/.local/share/bash-completion/completions/rune");
+        }
+        "fish" => {
+            // Write completion file
+            let comp_dir = home.join(".config/fish/completions");
+            fs::create_dir_all(&comp_dir)
+                .map_err(|e| format!("Failed to create completions dir: {}", e))?;
+            fs::write(comp_dir.join("rune.fish"), script.as_ref())
+                .map_err(|e| format!("Failed to write completion file: {}", e))?;
+
+            println!("  ✓ Completions installed to ~/.config/fish/completions/rune.fish");
+        }
+        _ => return Err(format!("Unsupported shell: {}", shell)),
     }
 
-    // Ensure parent directory exists (for fish)
-    if let Some(parent) = config_file.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("Failed to create config dir: {}", e))?;
-    }
-
-    // Append completion line
-    let mut file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&config_file)
-        .map_err(|e| format!("Failed to open {}: {}", config_file.display(), e))?;
-
-    writeln!(file, "\n# Rune shell completions")
-        .map_err(|e| format!("Failed to write to {}: {}", config_file.display(), e))?;
-    writeln!(file, "{}", completion_line)
-        .map_err(|e| format!("Failed to write to {}: {}", config_file.display(), e))?;
-
-    println!("  ✓ Shell completions configured (restart shell to apply)");
     Ok(())
 }
 
