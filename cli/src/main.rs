@@ -1,9 +1,11 @@
 //! Rune CLI - Generate scaffolded code from .rune specs
 
+use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueHint};
+use clap_complete::{generate, Shell};
 
 use rune_cli::commands;
 use rune_cli::configs::list_configs;
@@ -22,25 +24,29 @@ enum Commands {
     /// Generate code from a .rune file
     Generate {
         /// Input .rune file
+        #[arg(value_hint = ValueHint::FilePath)]
         input: PathBuf,
 
         /// Configuration to use (run `rune configs` to list)
+        #[arg(value_parser = ["ts-deno-native-class-validator-esm"])]
         config: String,
 
         /// Output directory (defaults to input file directory)
-        #[arg(short, long)]
+        #[arg(short, long, value_hint = ValueHint::DirPath)]
         output: Option<PathBuf>,
     },
 
     /// Validate a .rune file
     Validate {
         /// Input .rune file
+        #[arg(value_hint = ValueHint::FilePath)]
         input: PathBuf,
     },
 
     /// Format a .rune file
     Format {
         /// Input .rune file
+        #[arg(value_hint = ValueHint::FilePath)]
         input: PathBuf,
 
         /// Check if file is formatted without modifying it
@@ -54,7 +60,7 @@ enum Commands {
         name: String,
 
         /// Configuration to use
-        #[arg(short, long, default_value = "ts-deno-native-class-validator-esm")]
+        #[arg(short, long, default_value = "ts-deno-native-class-validator-esm", value_parser = ["ts-deno-native-class-validator-esm"])]
         config: String,
     },
 
@@ -63,16 +69,23 @@ enum Commands {
 
     /// Install Rune (LSP, parser, editor integration)
     Install {
-        /// Editor to configure (neovim, helix, vscode, zed, sublime, emacs)
-        #[arg(short, long)]
+        /// Editor to configure
+        #[arg(short, long, value_parser = ["neovim", "helix", "vscode", "zed", "sublime", "emacs"])]
         editor: Option<String>,
     },
 
     /// Uninstall Rune (remove LSP, parser, editor integration)
     Uninstall {
-        /// Editor to unconfigure (neovim, helix, vscode, zed, sublime, emacs)
-        #[arg(short, long)]
+        /// Editor to unconfigure
+        #[arg(short, long, value_parser = ["neovim", "helix", "vscode", "zed", "sublime", "emacs"])]
         editor: Option<String>,
+    },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
     },
 }
 
@@ -174,6 +187,11 @@ fn main() -> ExitCode {
                     ExitCode::FAILURE
                 }
             }
+        }
+
+        Commands::Completions { shell } => {
+            generate(shell, &mut Cli::command(), "rune", &mut io::stdout());
+            ExitCode::SUCCESS
         }
     }
 }
