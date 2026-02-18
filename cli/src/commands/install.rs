@@ -367,6 +367,16 @@ fn build_lsp(bin_dir: &PathBuf) -> Result<(), String> {
     fs::copy(&lsp_binary, &dest)
         .map_err(|e| format!("Failed to install LSP binary: {}", e))?;
 
+    // Ad-hoc sign on macOS to avoid security kill
+    #[cfg(target_os = "macos")]
+    {
+        let _ = Command::new("codesign")
+            .arg("-s")
+            .arg("-")
+            .arg(&dest)
+            .output();
+    }
+
     println!("  ✓ LSP installed");
     Ok(())
 }
