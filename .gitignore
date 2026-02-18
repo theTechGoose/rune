@@ -15,3 +15,5 @@ dist.rune/
 .DS_Store
 *.swp
 *.swo
+docs/src/
+dist.rune/
