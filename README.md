@@ -16,19 +16,11 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 
 [Full syntax &rarr;](docs/rules-cheatsheet.md)
 
-## Quickstart
+## Install
 
 ```bash
-git clone https://github.com/youruser/rune.git
-cd rune
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
 ```
-
-The installer builds the LSP and parser, then prompts you to configure your editor.
-
-**Installs to:**
-- `~/.local/bin/rune` — LSP binary
-- `~/.local/share/rune/` — parser, queries, palettes
 
 ## Features
 
