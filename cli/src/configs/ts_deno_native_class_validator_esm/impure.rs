@@ -148,6 +148,12 @@ fn generate_impure_method(method: &MethodInfo, is_static: bool) -> String {
 
     // TODO stub for boundary call
     body_lines.push("    // TODO: implement boundary call".to_string());
+
+    // Add return validation comment if method returns a DTO
+    if matches!(method.return_type, TypeRef::Dto(_)) {
+        body_lines.push("    // TODO: validate return DTO before returning".to_string());
+    }
+
     body_lines.push("    throw new Error(\"Not implemented\");".to_string());
 
     let body = body_lines.join("\n");
@@ -172,10 +178,11 @@ fn generate_param_validation(param: &crate::analyzer::ParamInfo, method_name: &s
                 param.name, js_type, param.name, method_name, prim
             )
         }
-        TypeRef::Dto(dto_name) => {
+        TypeRef::Dto(_) => {
+            // DTO params are already instances, just validate them
             format!(
-                "    await validateDto(new {}({}));",
-                dto_name, param.name
+                "    await validateDto({});",
+                param.name
             )
         }
         TypeRef::Custom(_) => {
@@ -282,7 +289,7 @@ mod tests {
 
         let output = generate_impure_class_code(&noun);
 
-        assert!(output.contains("await validateDto(new IdDto(dto))"));
+        assert!(output.contains("await validateDto(dto)"));
     }
 
     #[test]

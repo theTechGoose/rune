@@ -9,6 +9,7 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
     // Imports
     lines.push(format!("import {{ {} }} from \"../dto/{}.ts\";", req.input_dto, to_kebab(&req.input_dto)));
     lines.push(format!("import {{ {} }} from \"../dto/{}.ts\";", req.output_dto, to_kebab(&req.output_dto)));
+    lines.push("import { validateDto } from \"../dto/_shared.ts\";".to_string());
     lines.push(String::new());
 
     // Core function (pure inner function - the seam)
@@ -44,6 +45,11 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
 
     // Outer body: instantiate boundary classes, call core, execute side effects
     lines.push("  // TODO: implement orchestration".to_string());
+    lines.push(String::new());
+
+    // Input validation
+    lines.push(format!("  // await validateDto(input); // validate input {}", req.input_dto));
+    lines.push(String::new());
 
     // Instantiate boundary classes
     let boundary_classes = extract_boundary_classes(req);
@@ -68,7 +74,11 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
     }
     lines.push(String::new());
 
-    lines.push(format!("  throw new Error(\"Not implemented\");"));
+    // Output validation
+    lines.push(format!("  // await validateDto(result); // validate output {} before returning", req.output_dto));
+    lines.push(String::new());
+
+    lines.push("  throw new Error(\"Not implemented\");".to_string());
     lines.push("}".to_string());
 
     lines.join("\n")
