@@ -1,6 +1,6 @@
-[syntax-highlighting]
+# Syntax Highlighting
 
-Editor syntax highlighting for `requirements` files.
+Editor syntax highlighting for `rune` files.
 
 ## Philosophy
 
@@ -13,19 +13,20 @@ semantically important nodes get color treatment.
 
 ## Color Scheme
 
-| Hex       | Name     | Capture      | Elements                              |
-| --------- | -------- | ------------ | ------------------------------------- |
-| `#f9e2af` | Yellow   | `@define`    | Tags: `[REQ]`, `[DTO]`, `[TYP]`, etc. |
-| `#89b4fa` | Blue     | `@type`      | DTO refs, type names, builtins        |
-| `#f38ba8` | Red      | `@error`     | Faults (`not-found`, `timed-out`)     |
-| `#fab387` | Peach    | `@attribute` | Boundary prefixes (`db:`, `ex:`, etc.)|
-| `#6c7086` | Overlay0 | `@comment`   | Comments, descriptions                |
-| `#585b70` | Surface2 | `@punctuation.delimiter` | Brackets `{}[]<>`     |
-| —         | Default  | (none)       | Nouns, verbs, params, properties      |
+| Hex       | Name     | Capture                  | Elements                               |
+| --------- | -------- | ------------------------ | -------------------------------------- |
+| `#f9e2af` | Yellow   | `@define`                | Tags: `[REQ]`, `[DTO]`, `[TYP]`, etc.  |
+| `#89b4fa` | Blue     | `@type`                  | DTO refs, type names, builtins         |
+| `#f38ba8` | Red      | `@error`                 | Faults (`not-found`, `timed-out`)      |
+| `#fab387` | Peach    | `@attribute`             | Boundary prefixes (`db:`, `ex:`, etc.) |
+| `#6c7086` | Overlay0 | `@comment`               | Comments, descriptions                 |
+| `#585b70` | Surface2 | `@punctuation.delimiter` | Brackets `{}[]<>`                      |
+| —         | Default  | (none)                   | Nouns, verbs, params, properties       |
 
 Based on [Catppuccin Mocha](https://catppuccin.com/palette/).
 
 **Design principles:**
+
 - **4 accent colors** for semantically distinct categories
 - **Default text** for everything else (nouns, verbs, params)
 - **Muted brackets** that fade into background
@@ -36,25 +37,25 @@ Based on [Catppuccin Mocha](https://catppuccin.com/palette/).
 
 Only these node types receive color highlighting:
 
-| Node type         | Capture      | Color   | Purpose                        |
-| ----------------- | ------------ | ------- | ------------------------------ |
-| `req_tag`         | `@define`    | yellow  | structural tag                 |
-| `dto_tag`         | `@define`    | yellow  | structural tag                 |
-| `typ_tag`         | `@define`    | yellow  | structural tag                 |
-| `ply_tag`         | `@define`    | yellow  | structural tag                 |
-| `cse_tag`         | `@define`    | yellow  | structural tag                 |
-| `ctr_tag`         | `@define`    | yellow  | structural tag                 |
-| `ret_tag`         | `@define`    | yellow  | structural tag                 |
-| `dto_reference`   | `@type`      | blue    | type reference                 |
-| `dto_def_name`    | `@type`      | blue    | type definition                |
-| `typ_type`        | `@type`      | blue    | type annotation                |
-| `typ_generic_type`| `@type`      | blue    | generic type                   |
-| `typ_tuple_type`  | `@type`      | blue    | tuple type                     |
-| `fault_name`      | `@error`     | red     | error condition                |
-| `boundary_prefix` | `@attribute` | peach   | system boundary                |
-| `typ_desc`        | `@comment`   | overlay0| description                    |
-| `dto_desc`        | `@comment`   | overlay0| description                    |
-| `comment`         | `@comment`   | overlay0| inline comment                 |
+| Node type          | Capture      | Color    | Purpose         |
+| ------------------ | ------------ | -------- | --------------- |
+| `req_tag`          | `@define`    | yellow   | structural tag  |
+| `dto_tag`          | `@define`    | yellow   | structural tag  |
+| `typ_tag`          | `@define`    | yellow   | structural tag  |
+| `ply_tag`          | `@define`    | yellow   | structural tag  |
+| `cse_tag`          | `@define`    | yellow   | structural tag  |
+| `ctr_tag`          | `@define`    | yellow   | structural tag  |
+| `ret_tag`          | `@define`    | yellow   | structural tag  |
+| `dto_reference`    | `@type`      | blue     | type reference  |
+| `dto_def_name`     | `@type`      | blue     | type definition |
+| `typ_type`         | `@type`      | blue     | type annotation |
+| `typ_generic_type` | `@type`      | blue     | generic type    |
+| `typ_tuple_type`   | `@type`      | blue     | tuple type      |
+| `fault_name`       | `@error`     | red      | error condition |
+| `boundary_prefix`  | `@attribute` | peach    | system boundary |
+| `typ_desc`         | `@comment`   | overlay0 | description     |
+| `dto_desc`         | `@comment`   | overlay0 | description     |
+| `comment`          | `@comment`   | overlay0 | inline comment  |
 
 ### Unhighlighted Node Types
 
@@ -71,6 +72,7 @@ These nodes use the editor's default foreground color:
 ### Punctuation
 
 Brackets are muted (`@punctuation.delimiter`):
+
 - `{` `}` in inline DTOs
 - `[` `]` in array types and tuples
 - `<` `>` in generic types

@@ -1,6 +1,6 @@
-[test-specification]
+# Rune
 
-Defines the notation used in `requirements` files.
+Defines the notation used in `rune` files.
 
 ## Requirement
 
@@ -36,16 +36,19 @@ Use `.` for instance methods and `::` for static methods:
 ```
 
 **Instance methods** (`noun.verb()`):
+
 - Operates on an instance
 - `noun` must be returned by a previous step (in scope)
 
 **Static methods** (`noun::verb()`):
+
 - Class-level operation, no instance needed
 - `noun` does NOT need to be in scope
 
 The noun casing matches its `[TYP]` definition. If the type is defined as `[TYP] provider: Class`, use `provider::` for static calls and `provider.` for instance calls.
 
 **Scope rules:**
+
 ```
     provider::pick(name): provider    // static - no scope check
     provider.getRecording(id): data   // instance - 'provider' must be in scope
@@ -266,17 +269,20 @@ Inline comments use `//` syntax:
 The LSP enforces these rules:
 
 ### Requirement validation
+
 - REQ input must be a DTO (ends in `Dto`) or inline `{}`
 - REQ output must be a DTO
 - Last step must return the REQ's output DTO
 
 ### Scope validation
+
 - Instance methods (`noun.verb()`) require `noun` to be returned by a previous step
 - Static methods (`Noun::verb()`) have no scope requirements
 - Parameters must be in scope: either returned by a previous step OR provided by the REQ input DTO
 - REQ input DTO properties (including nested DTOs) are automatically in scope
 
 ### Indentation validation
+
 - REQ at column 0
 - Steps at 4 spaces
 - Faults at 6 spaces (2 deeper than parent step)
@@ -286,33 +292,40 @@ The LSP enforces these rules:
 - Faults inside cases at 10 spaces
 
 ### Boundary validation
+
 - Boundary parameters must be DTOs or primitives
 - Boundary return types must be DTOs or primitives
 
 ### Type validation
+
 - Parameters must reference defined types or DTOs
 - Return types must reference defined types, DTOs, or `void`
 
 ### Signature consistency validation
+
 - The same `noun.verb` or `Noun::verb` must have identical signatures throughout the document
 - Parameters and return types must match across all calls to the same method
 - Error shows the first occurrence's signature for reference
 
 ### Duplicate definition validation
+
 - Each `[TYP]` name must be unique
 - Each `[DTO]` name must be unique
 - Duplicate definitions generate errors referencing the first occurrence
 
 ### Unused element validation
+
 - All defined types (`[TYP]`) must be used somewhere
 - All defined DTOs (`[DTO]`) must be used somewhere
 - Unused elements generate warnings
 
 ### Constructor validation
+
 - `[CTR] class` is the only valid constructor syntax
 - Constructor must reference a defined `[TYP]` with type `Class`
 
 ### DTO description validation
+
 - Every `[DTO]` must have a description on the following line
 - Description must be indented 4 spaces
 - Missing descriptions generate an error
@@ -321,15 +334,15 @@ The LSP enforces these rules:
 
 All keyword tags are exactly 3 letters inside brackets (`[XXX]`). This ensures content after the tag always starts at column 7, maintaining visual alignment.
 
-| Tag     | Purpose                          |
-| ------- | -------------------------------- |
-| `[REQ]` | Requirement definition           |
-| `[PLY]` | Polymorphic step                 |
-| `[CSE]` | Case inside polymorphic block    |
-| `[CTR]` | Constructor shorthand            |
-| `[RET]` | Return value from scope          |
-| `[TYP]` | Type definition                  |
-| `[DTO]` | DTO definition                   |
+| Tag     | Purpose                       |
+| ------- | ----------------------------- |
+| `[REQ]` | Requirement definition        |
+| `[PLY]` | Polymorphic step              |
+| `[CSE]` | Case inside polymorphic block |
+| `[CTR]` | Constructor shorthand         |
+| `[RET]` | Return value from scope       |
+| `[TYP]` | Type definition               |
+| `[DTO]` | DTO definition                |
 
 ## Traced Example
 
