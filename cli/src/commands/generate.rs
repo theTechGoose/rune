@@ -6,6 +6,17 @@ use std::path::Path;
 use crate::analyzer::{analyze, AnalyzedSpec};
 use crate::configs::{get_generator, Generator};
 
+/// Write content to a file only if it doesn't already exist
+fn write_if_not_exists(path: &Path, content: &str) -> Result<bool, String> {
+    if path.exists() {
+        Ok(false) // File exists, skipped
+    } else {
+        fs::write(path, content)
+            .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
+        Ok(true) // File written
+    }
+}
+
 /// Generate scaffolded code from a .rune file
 pub fn generate(
     input_path: &Path,
@@ -56,21 +67,20 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
     fs::create_dir_all(dist_dir.join("integration"))
         .map_err(|e| format!("Failed to create integration directory: {}", e))?;
 
-    // Generate shared utilities
+    // Generate shared utilities (always overwrite - this is infrastructure)
     let shared_content = generator.generate_shared();
     let shared_path = dist_dir.join("dto").join(format!("_shared.{}", ext));
-    fs::write(&shared_path, shared_content)
+    fs::write(&shared_path, &shared_content)
         .map_err(|e| format!("Failed to write {}: {}", shared_path.display(), e))?;
 
-    // Generate DTOs
+    // Generate DTOs (skip if exists)
     for dto in &spec.dtos {
         let content = generator.generate_dto(dto);
         let file_path = dist_dir.join("dto").join(format!("{}.{}", dto.kebab_name, ext));
-        fs::write(&file_path, content)
-            .map_err(|e| format!("Failed to write {}: {}", file_path.display(), e))?;
+        write_if_not_exists(&file_path, &content)?;
     }
 
-    // Generate pure classes (skip polymorphic nouns)
+    // Generate pure classes (skip polymorphic nouns, skip if exists)
     for noun in &spec.nouns {
         if !noun.is_impure && !poly_nouns.contains(&noun.name) {
             // Create noun directory
@@ -78,21 +88,19 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             fs::create_dir_all(&noun_dir)
                 .map_err(|e| format!("Failed to create pure/{} directory: {}", noun.name, e))?;
 
-            // Generate class
+            // Generate class (skip if exists)
             let class_content = generator.generate_pure_class(noun);
             let class_path = noun_dir.join(format!("{}.{}", noun.name, ext));
-            fs::write(&class_path, class_content)
-                .map_err(|e| format!("Failed to write {}: {}", class_path.display(), e))?;
+            write_if_not_exists(&class_path, &class_content)?;
 
-            // Generate tests
+            // Generate tests (skip if exists)
             let test_content = generator.generate_pure_test(noun);
             let test_path = noun_dir.join(format!("{}{}.{}", noun.name, test_suffix, ext));
-            fs::write(&test_path, test_content)
-                .map_err(|e| format!("Failed to write {}: {}", test_path.display(), e))?;
+            write_if_not_exists(&test_path, &test_content)?;
         }
     }
 
-    // Generate impure classes (skip polymorphic nouns)
+    // Generate impure classes (skip polymorphic nouns, skip if exists)
     for noun in &spec.nouns {
         if noun.is_impure && !poly_nouns.contains(&noun.name) {
             // Create noun directory
@@ -100,41 +108,37 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             fs::create_dir_all(&noun_dir)
                 .map_err(|e| format!("Failed to create impure/{} directory: {}", noun.name, e))?;
 
-            // Generate class
+            // Generate class (skip if exists)
             let class_content = generator.generate_impure_class(noun);
             let class_path = noun_dir.join(format!("{}.{}", noun.name, ext));
-            fs::write(&class_path, class_content)
-                .map_err(|e| format!("Failed to write {}: {}", class_path.display(), e))?;
+            write_if_not_exists(&class_path, &class_content)?;
 
-            // Generate tests
+            // Generate tests (skip if exists)
             let test_content = generator.generate_impure_test(noun);
             let test_path = noun_dir.join(format!("{}{}.{}", noun.name, test_suffix, ext));
-            fs::write(&test_path, test_content)
-                .map_err(|e| format!("Failed to write {}: {}", test_path.display(), e))?;
+            write_if_not_exists(&test_path, &test_content)?;
         }
     }
 
-    // Generate integration code
+    // Generate integration code (skip if exists)
     for req in &spec.requirements {
         // Create integration directory
         let integration_dir = dist_dir.join("integration").join(format!("{}-{}", req.noun, req.verb));
         fs::create_dir_all(&integration_dir)
             .map_err(|e| format!("Failed to create integration/{}-{} directory: {}", req.noun, req.verb, e))?;
 
-        // Generate integration code
+        // Generate integration code (skip if exists)
         let code_content = generator.generate_integration(req);
         let code_path = integration_dir.join(format!("{}-{}.{}", req.noun, req.verb, ext));
-        fs::write(&code_path, code_content)
-            .map_err(|e| format!("Failed to write {}: {}", code_path.display(), e))?;
+        write_if_not_exists(&code_path, &code_content)?;
 
-        // Generate integration tests
+        // Generate integration tests (skip if exists)
         let test_content = generator.generate_integration_test(req);
         let test_path = integration_dir.join(format!("{}-{}{}.{}", req.noun, req.verb, test_suffix, ext));
-        fs::write(&test_path, test_content)
-            .map_err(|e| format!("Failed to write {}: {}", test_path.display(), e))?;
+        write_if_not_exists(&test_path, &test_content)?;
     }
 
-    // Generate polymorphic classes (in pure/ or impure/ based on boundaries)
+    // Generate polymorphic classes (in pure/ or impure/ based on boundaries, skip if exists)
     for poly in &spec.polymorphics {
         // Create polymorphic noun directory structure:
         // <pure|impure>/<noun>/
@@ -159,28 +163,26 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
         fs::create_dir_all(&impl_dir)
             .map_err(|e| format!("Failed to create {}/{}/implementations directory: {}", purity_dir, poly.noun, e))?;
 
-        // Generate main module
+        // Generate main module (always overwrite - just re-exports)
         let mod_content = generator.generate_poly_mod(poly);
         let mod_path = poly_dir.join(format!("mod.{}", ext));
-        fs::write(&mod_path, mod_content)
+        fs::write(&mod_path, &mod_content)
             .map_err(|e| format!("Failed to write {}: {}", mod_path.display(), e))?;
 
-        // Generate base class in shared/
+        // Generate base class in shared/ (skip if exists)
         let base_content = generator.generate_poly_base_class(poly);
         let base_path = shared_dir.join(format!("mod.{}", ext));
-        fs::write(&base_path, base_content)
-            .map_err(|e| format!("Failed to write {}: {}", base_path.display(), e))?;
+        write_if_not_exists(&base_path, &base_content)?;
 
-        // Generate base tests in shared/
+        // Generate base tests in shared/ (skip if exists)
         let base_test_content = generator.generate_poly_base_test(poly);
         let base_test_path = shared_dir.join(format!("mod{}.{}", test_suffix, ext));
-        fs::write(&base_test_path, base_test_content)
-            .map_err(|e| format!("Failed to write {}: {}", base_test_path.display(), e))?;
+        write_if_not_exists(&base_test_path, &base_test_content)?;
 
-        // Generate implementations module
+        // Generate implementations module (always overwrite - just re-exports)
         let impl_mod_content = generator.generate_poly_implementations_mod(poly);
         let impl_mod_path = impl_dir.join(format!("mod.{}", ext));
-        fs::write(&impl_mod_path, impl_mod_content)
+        fs::write(&impl_mod_path, &impl_mod_content)
             .map_err(|e| format!("Failed to write {}: {}", impl_mod_path.display(), e))?;
 
         // Generate each case implementation
@@ -189,17 +191,15 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             fs::create_dir_all(&case_dir)
                 .map_err(|e| format!("Failed to create case directory {}: {}", case.kebab_name, e))?;
 
-            // Generate case class
+            // Generate case class (skip if exists)
             let case_content = generator.generate_poly_case_class(poly, case);
             let case_path = case_dir.join(format!("mod.{}", ext));
-            fs::write(&case_path, case_content)
-                .map_err(|e| format!("Failed to write {}: {}", case_path.display(), e))?;
+            write_if_not_exists(&case_path, &case_content)?;
 
-            // Generate case tests
+            // Generate case tests (skip if exists)
             let case_test_content = generator.generate_poly_case_test(poly, case);
             let case_test_path = case_dir.join(format!("mod{}.{}", test_suffix, ext));
-            fs::write(&case_test_path, case_test_content)
-                .map_err(|e| format!("Failed to write {}: {}", case_test_path.display(), e))?;
+            write_if_not_exists(&case_test_path, &case_test_content)?;
         }
     }
 
@@ -309,5 +309,46 @@ mod tests {
         let dist_dir = temp.path().join("dist.rune");
         assert!(dist_dir.join("impure/storage/storage.ts").exists());
         assert!(dist_dir.join("impure/storage/storage_test.ts").exists());
+    }
+
+    #[test]
+    fn generate_skips_existing_files() {
+        let temp = tempdir().unwrap();
+        let input_path = temp.path().join("example.rune");
+
+        fs::write(&input_path, r#"
+[REQ] test.run(InputDto): OutputDto
+    id::create(name): id
+    id.toDto(): OutputDto
+
+[TYP] id: Class
+    identifier
+[TYP] name: string
+    name
+
+[DTO] InputDto: name
+    input
+[DTO] OutputDto: id
+    output
+"#).unwrap();
+
+        // First run: generates all files
+        let result = generate(&input_path, "ts-deno-native-class-validator-esm", None);
+        assert!(result.is_ok());
+
+        let dist_dir = temp.path().join("dist.rune");
+        let class_path = dist_dir.join("pure/id/id.ts");
+
+        // Modify the generated file with custom content
+        let custom_content = "// Custom implementation - should not be overwritten";
+        fs::write(&class_path, custom_content).unwrap();
+
+        // Second run: should skip existing files
+        let result = generate(&input_path, "ts-deno-native-class-validator-esm", None);
+        assert!(result.is_ok());
+
+        // Verify the file was NOT overwritten
+        let content = fs::read_to_string(&class_path).unwrap();
+        assert_eq!(content, custom_content, "File should not have been overwritten");
     }
 }
