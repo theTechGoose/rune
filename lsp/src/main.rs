@@ -50,6 +50,11 @@ impl Backend {
         let mut defined_dtos_lines: HashMap<String, usize> = HashMap::new(); // name -> line
         let mut defined_types: HashMap<String, String> = HashMap::new(); // name -> type_name
         let mut defined_types_lines: HashMap<String, usize> = HashMap::new(); // name -> line
+        let mut defined_nouns: HashSet<String> = HashSet::new();
+        let mut defined_nouns_lines: HashMap<String, usize> = HashMap::new(); // name -> line
+        let mut used_nouns: HashSet<String> = HashSet::new();
+        let mut noun_has_desc: HashSet<String> = HashSet::new();
+        let mut last_noun_name: Option<String> = None;
         let mut referenced_dtos: Vec<(usize, String)> = Vec::new();
         let mut used_types: HashSet<String> = HashSet::new();
         let mut used_dtos: HashSet<String> = HashSet::new();
@@ -101,11 +106,13 @@ impl Backend {
                     }
                     // Store properties for later use
                     for prop in properties {
+                        // Strip optional suffix before type resolution
+                        let base_prop = prop.trim_end_matches('?');
                         // Parse array property syntax like "url(s)" -> base type "url"
-                        let type_name = if let Some(paren_pos) = prop.find('(') {
-                            prop[..paren_pos].to_string()
+                        let type_name = if let Some(paren_pos) = base_prop.find('(') {
+                            base_prop[..paren_pos].to_string()
                         } else {
-                            prop.clone()
+                            base_prop.to_string()
                         };
                         dto_properties
                             .entry(name.clone())
@@ -156,6 +163,30 @@ impl Backend {
                     } else {
                         defined_types.insert(name.clone(), type_name.clone());
                         defined_types_lines.insert(name.clone(), line_num);
+                    }
+                    last_noun_name = None;
+                }
+                LineKind::NonDef { name } => {
+                    // Check for duplicate NON definition
+                    if let Some(&first_line) = defined_nouns_lines.get(name) {
+                        diagnostics.push(Diagnostic {
+                            range: line_range(line_num),
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            message: format!(
+                                "Duplicate noun definition '{}' (first defined on line {})",
+                                name, first_line + 1
+                            ),
+                            ..Default::default()
+                        });
+                    } else {
+                        defined_nouns.insert(name.clone());
+                        defined_nouns_lines.insert(name.clone(), line_num);
+                    }
+                    last_noun_name = Some(name.clone());
+                }
+                LineKind::NonDesc { text: _, indent: _ } => {
+                    if let Some(ref noun_name) = last_noun_name {
+                        noun_has_desc.insert(noun_name.clone());
                     }
                 }
                 _ => {}
@@ -273,6 +304,18 @@ impl Backend {
                         in_poly_block = false;
                     }
 
+                    // Track noun usage
+                    if defined_nouns.contains(noun) {
+                        used_nouns.insert(noun.clone());
+                    } else if !defined_types.contains_key(noun) && !defined_dtos.contains(noun) {
+                        diagnostics.push(Diagnostic {
+                            range: line_range(line_num),
+                            severity: Some(DiagnosticSeverity::WARNING),
+                            message: format!("Noun '{}' is not declared with [NON]", noun),
+                            ..Default::default()
+                        });
+                    }
+
                     // Steps at 4 spaces normally, 8 spaces inside poly block
                     let expected_indent = if in_poly_block { 8 } else { 4 };
                     if *indent != expected_indent {
@@ -350,6 +393,8 @@ impl Backend {
                             used_types.insert(output.clone());
                         } else if defined_dtos.contains(output) {
                             used_dtos.insert(output.clone());
+                        } else if defined_nouns.contains(output) {
+                            used_nouns.insert(output.clone());
                         } else {
                             diagnostics.push(Diagnostic {
                                 range: line_range(line_num),
@@ -388,6 +433,11 @@ impl Backend {
                     // Exit poly block when we return to 4-space indent (before validation)
                     if *indent == 4 && in_poly_block {
                         in_poly_block = false;
+                    }
+
+                    // Track noun usage
+                    if defined_nouns.contains(noun) {
+                        used_nouns.insert(noun.clone());
                     }
 
                     // Boundary steps at 4 spaces normally, 8 spaces inside poly block
@@ -499,6 +549,8 @@ impl Backend {
                             used_types.insert(output.clone());
                         } else if defined_dtos.contains(output) {
                             used_dtos.insert(output.clone());
+                        } else if defined_nouns.contains(output) {
+                            used_nouns.insert(output.clone());
                         } else {
                             diagnostics.push(Diagnostic {
                                 range: line_range(line_num),
@@ -561,6 +613,11 @@ impl Backend {
                 }
 
                 LineKind::Ply { noun, verb, params, output, indent, is_static } => {
+                    // Track noun usage
+                    if defined_nouns.contains(noun) {
+                        used_nouns.insert(noun.clone());
+                    }
+
                     // Polymorphic step - must be at 4 spaces (step level)
                     if *indent != 4 {
                         diagnostics.push(Diagnostic {
@@ -594,6 +651,8 @@ impl Backend {
                         used_types.insert(output.clone());
                     } else if defined_dtos.contains(output) {
                         used_dtos.insert(output.clone());
+                    } else if defined_nouns.contains(output) {
+                        used_nouns.insert(output.clone());
                     }
 
                     // Add output to scope
@@ -771,6 +830,16 @@ impl Backend {
                     consecutive_empty = 0;
                 }
 
+                LineKind::NonDef { .. } => {
+                    // NON definitions handled in first pass
+                    consecutive_empty = 0;
+                }
+
+                LineKind::NonDesc { .. } => {
+                    // NON description lines follow NON definitions
+                    consecutive_empty = 0;
+                }
+
                 LineKind::Comment { .. } => {
                     // Comments are ignored during validation
                 }
@@ -812,8 +881,8 @@ impl Backend {
                     consecutive_empty = 0;
                 }
 
-                LineKind::Ctr { class_name, indent } => {
-                    // Constructor shorthand: [CTR] class
+                LineKind::New { class_name, indent } => {
+                    // Constructor shorthand: [NEW] class
                     // Exit poly block when we return to 4-space indent (before validation)
                     if *indent == 4 && in_poly_block {
                         in_poly_block = false;
@@ -824,27 +893,19 @@ impl Backend {
                         diagnostics.push(Diagnostic {
                             range: line_range(line_num),
                             severity: Some(DiagnosticSeverity::ERROR),
-                            message: format!("[CTR] should be indented {} spaces, got {}", expected_indent, indent),
+                            message: format!("[NEW] should be indented {} spaces, got {}", expected_indent, indent),
                             ..Default::default()
                         });
                     }
 
-                    // Validate class_name references a Class type
-                    if let Some(type_name) = defined_types.get(class_name) {
-                        used_types.insert(class_name.clone());
-                        if type_name != "Class" {
-                            diagnostics.push(Diagnostic {
-                                range: line_range(line_num),
-                                severity: Some(DiagnosticSeverity::ERROR),
-                                message: format!("'{}' must be a Class type to use [CTR], got '{}'", class_name, type_name),
-                                ..Default::default()
-                            });
-                        }
+                    // Validate class_name references a declared noun
+                    if defined_nouns.contains(class_name) {
+                        used_nouns.insert(class_name.clone());
                     } else {
                         diagnostics.push(Diagnostic {
                             range: line_range(line_num),
                             severity: Some(DiagnosticSeverity::WARNING),
-                            message: format!("Type '{}' is not defined", class_name),
+                            message: format!("Noun '{}' is not declared with [NON]", class_name),
                             ..Default::default()
                         });
                     }
@@ -942,6 +1003,18 @@ impl Backend {
             }
         }
 
+        // Check for unused nouns
+        for (noun_name, line_num) in &defined_nouns_lines {
+            if !used_nouns.contains(noun_name) {
+                diagnostics.push(Diagnostic {
+                    range: line_range(*line_num),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    message: format!("Noun '{}' is defined but never used", noun_name),
+                    ..Default::default()
+                });
+            }
+        }
+
         // Check for unused DTOs
         for (dto_name, line_num) in &defined_dtos_lines {
             if !used_dtos.contains(dto_name) {
@@ -972,12 +1045,6 @@ impl Backend {
     }
 }
 
-fn is_upper_snake_case(s: &str) -> bool {
-    !s.is_empty()
-        && s.chars().all(|c| c.is_uppercase() || c.is_numeric() || c == '_')
-        && s.chars().next().map(|c| c.is_uppercase()).unwrap_or(false)
-}
-
 fn line_range(line: usize) -> Range {
     Range {
         start: Position {
@@ -995,7 +1062,7 @@ fn line_range(line: usize) -> Range {
 fn is_primitive(s: &str) -> bool {
     matches!(
         s,
-        "string" | "number" | "boolean" | "void" | "Uint8Array" | "Primitive" | "Class"
+        "string" | "number" | "boolean" | "void" | "Uint8Array" | "Primitive"
     )
 }
 
@@ -1023,12 +1090,17 @@ fn is_dto_or_primitive(s: &str, defined_types: &HashMap<String, String>) -> bool
 }
 
 /// Check if a type expression is valid for [TYP] definitions
-/// Valid: primitives, generics (Array<T>, Record<K,V>), tuples ([a, b])
+/// Valid: primitives, generics (Array<T>, Record<K,V>), tuples ([a, b]), string enums
 fn is_valid_primitive_type(s: &str) -> bool {
     let s = s.trim();
 
     // Raw primitives
     if is_primitive(s) {
+        return true;
+    }
+
+    // String enum types like "genie" | "fiveNine"
+    if s.contains('"') && s.contains('|') {
         return true;
     }
 
@@ -1136,6 +1208,24 @@ impl LanguageServer for Backend {
             }
         }
 
+        // Tags at column 0
+        if prefix.trim().is_empty() && col == 0 || prefix.starts_with('[') {
+            for tag in ["[REQ]", "[DTO]", "[TYP]", "[NON]"] {
+                items.push(CompletionItem {
+                    label: tag.to_string(),
+                    kind: Some(CompletionItemKind::KEYWORD),
+                    detail: Some(match tag {
+                        "[REQ]" => "requirement".to_string(),
+                        "[DTO]" => "data transfer object".to_string(),
+                        "[TYP]" => "type alias".to_string(),
+                        "[NON]" => "noun declaration".to_string(),
+                        _ => "tag".to_string(),
+                    }),
+                    ..Default::default()
+                });
+            }
+        }
+
         // Common types (after colon)
         if prefix.ends_with(':') || prefix.ends_with(": ") {
             for t in ["string", "number", "boolean", "void"] {
@@ -1149,7 +1239,7 @@ impl LanguageServer for Backend {
 
         // Common faults (indented lines)
         if prefix.starts_with("      ") && !prefix.contains('.') && !prefix.contains(':') {
-            for f in ["not-found", "timed-out", "network-error", "invalid-input", "unauthorized"] {
+            for f in ["not-found", "timeout", "network-error", "invalid", "forbidden", "unauthorized"] {
                 items.push(CompletionItem {
                     label: f.to_string(),
                     kind: Some(CompletionItemKind::ENUM_MEMBER),
@@ -1170,6 +1260,9 @@ impl LanguageServer for Backend {
                 | LineKind::Step { noun, .. }
                 | LineKind::BoundaryStep { noun, .. } => {
                     nouns.insert(noun.clone());
+                }
+                LineKind::NonDef { name } => {
+                    nouns.insert(name.clone());
                 }
                 LineKind::DtoRef(name) | LineKind::DtoDef { name, properties: _ } => {
                     dtos.insert(name.clone());
@@ -1238,6 +1331,8 @@ impl LanguageServer for Backend {
 
         // Build TYP definitions map for hover on type references
         let mut typ_defs: HashMap<String, (String, Option<String>)> = HashMap::new();
+        // Build NON definitions map for hover on noun references
+        let mut non_defs: HashMap<String, Option<String>> = HashMap::new();
         let mut i = 0;
         while i < parsed.len() {
             if let LineKind::TypDef { name, type_name } = &parsed[i].kind {
@@ -1257,21 +1352,33 @@ impl LanguageServer for Backend {
                     Some(desc_lines.join(" "))
                 };
                 typ_defs.insert(name.clone(), (type_name.clone(), desc));
+            } else if let LineKind::NonDef { name } = &parsed[i].kind {
+                let mut desc_lines = Vec::new();
+                let mut j = i + 1;
+                while j < parsed.len() {
+                    if let LineKind::NonDesc { text, .. } = &parsed[j].kind {
+                        desc_lines.push(text.clone());
+                        j += 1;
+                    } else {
+                        break;
+                    }
+                }
+                let desc = if desc_lines.is_empty() {
+                    None
+                } else {
+                    Some(desc_lines.join(" "))
+                };
+                non_defs.insert(name.clone(), desc);
             }
             i += 1;
         }
 
         // Build DTO definitions map with properties
         let mut dto_defs: HashMap<String, Vec<String>> = HashMap::new();
-        let mut current_dto: Option<String> = None;
         for parsed_line in &parsed {
             match &parsed_line.kind {
                 LineKind::DtoDef { name, properties } => {
                     dto_defs.insert(name.clone(), properties.clone());
-                    current_dto = Some(name.clone());
-                }
-                LineKind::Empty => {
-                    current_dto = None;
                 }
                 _ => {}
             }
@@ -1292,6 +1399,22 @@ impl LanguageServer for Backend {
                 format!("**{}**: `{}`\n\n{}", word, type_name, d)
             } else {
                 format!("**{}**: `{}`", word, type_name)
+            };
+            return Ok(Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: content,
+                }),
+                range: None,
+            }));
+        }
+
+        // Check if it's a NON reference
+        if let Some(desc) = non_defs.get(&word) {
+            let content = if let Some(d) = desc {
+                format!("**{}** (noun)\n\n{}", word, d)
+            } else {
+                format!("**{}** (noun)", word)
             };
             return Ok(Some(Hover {
                 contents: HoverContents::Markup(MarkupContent {
@@ -1371,6 +1494,7 @@ impl LanguageServer for Backend {
         // Build maps of definitions with their line numbers
         let mut typ_lines: HashMap<String, usize> = HashMap::new();
         let mut dto_lines: HashMap<String, usize> = HashMap::new();
+        let mut non_lines: HashMap<String, usize> = HashMap::new();
 
         for parsed_line in &parsed {
             match &parsed_line.kind {
@@ -1379,6 +1503,9 @@ impl LanguageServer for Backend {
                 }
                 LineKind::DtoDef { name, properties: _ } => {
                     dto_lines.insert(name.clone(), parsed_line.line_num);
+                }
+                LineKind::NonDef { name } => {
+                    non_lines.insert(name.clone(), parsed_line.line_num);
                 }
                 _ => {}
             }
@@ -1410,8 +1537,19 @@ impl LanguageServer for Backend {
             }])));
         }
 
+        // Find NON definition
+        if let Some(&line_num) = non_lines.get(&word) {
+            self.client
+                .log_message(MessageType::INFO, format!("gd: found NON at line {}", line_num))
+                .await;
+            return Ok(Some(GotoDefinitionResponse::Array(vec![Location {
+                uri: uri.clone(),
+                range: line_range(line_num),
+            }])));
+        }
+
         self.client
-            .log_message(MessageType::INFO, format!("gd: '{}' not found in typ_lines or dto_lines", word))
+            .log_message(MessageType::INFO, format!("gd: '{}' not found in typ_lines, dto_lines, or non_lines", word))
             .await;
 
         Ok(None)
