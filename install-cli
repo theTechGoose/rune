@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -e
-
-cd "$(dirname "$0")"
-cargo install --path cli
-
-echo
-echo "Installed! Run 'rune install' to set up your editor."
