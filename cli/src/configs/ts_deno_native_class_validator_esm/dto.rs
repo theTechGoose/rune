@@ -29,16 +29,20 @@ pub fn generate_dto_code(dto: &DtoInfo) -> String {
 
         if prop.is_array {
             lines.push("  @IsArray()".to_string());
-            lines.push(format!("  @{}({{ each: true }})", decorator.trim_start_matches('@').trim_end_matches("()")));
+            if matches!(prop.type_ref, TypeRef::Dto(_)) {
+                lines.push("  @ValidateNested({ each: true })".to_string());
+            } else {
+                lines.push(format!("  @{}({{ each: true }})", decorator.trim_start_matches('@').trim_end_matches("()")));
+            }
+        } else if matches!(prop.type_ref, TypeRef::Dto(_)) {
+            lines.push("  @ValidateNested()".to_string());
         } else {
             lines.push(format!("  {}", decorator));
         }
 
-        if matches!(prop.type_ref, TypeRef::Dto(_)) {
-            lines.push("  @ValidateNested()".to_string());
-            if let TypeRef::Dto(dto_name) = &prop.type_ref {
-                lines.push(format!("  @Type(() => {})", dto_name));
-            }
+        // Add @Type decorator for nested DTOs
+        if let TypeRef::Dto(dto_name) = &prop.type_ref {
+            lines.push(format!("  @Type(() => {})", dto_name));
         }
 
         let prop_name = get_property_name(prop);

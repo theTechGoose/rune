@@ -29,8 +29,9 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
     lines.push("  // TODO: implement pure logic".to_string());
     for step in &req.steps {
         if step.boundary.is_none() && !matches!(step.kind, StepKind::Constructor) {
-            let step_comment = format_step_comment(step);
-            lines.push(format!("  // {}", step_comment));
+            if let Some(step_comment) = format_step_comment(step) {
+                lines.push(format!("  // {}", step_comment));
+            }
         }
     }
     lines.push(format!("  throw new Error(\"Not implemented\");"));
@@ -60,8 +61,9 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
     lines.push("  // Execute boundary side effects".to_string());
     for step in &req.steps {
         if step.boundary.is_some() {
-            let step_comment = format_step_comment(step);
-            lines.push(format!("  // await {}", step_comment));
+            if let Some(step_comment) = format_step_comment(step) {
+                lines.push(format!("  // await {}", step_comment));
+            }
         }
     }
     lines.push(String::new());
@@ -150,20 +152,21 @@ fn extract_boundary_classes(req: &ReqInfo) -> Vec<String> {
 }
 
 /// Format a step as a comment
-fn format_step_comment(step: &StepInfo) -> String {
+fn format_step_comment(step: &StepInfo) -> Option<String> {
     match &step.kind {
         StepKind::Regular | StepKind::Boundary | StepKind::Polymorphic => {
-            let sep = if step.is_static { "::" } else { "." };
-            format!("{}{}{}", step.noun, sep, step.verb)
+            // Use PascalCase.method format (TypeScript uses . for both static and instance)
+            Some(format!("{}.{}", capitalize(&step.noun), step.verb))
         }
         StepKind::Case(name) => {
-            format!("[CSE] {}", name)
+            Some(format!("[CSE] {}", name))
         }
         StepKind::Return => {
-            format!("[RET] {}", step.output)
+            // Skip [RET] comments - function signature already shows return type
+            None
         }
         StepKind::Constructor => {
-            format!("[CTR] {}", step.noun)
+            Some(format!("new {}", capitalize(&step.noun)))
         }
     }
 }

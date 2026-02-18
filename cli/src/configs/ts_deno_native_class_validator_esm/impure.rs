@@ -31,8 +31,7 @@ pub fn generate_impure_class_code(noun: &NounInfo) -> String {
     }
 
     // Imports for validation
-    lines.push("import { validate } from \"class-validator\";".to_string());
-    lines.push("import { plainToInstance } from \"class-transformer\";".to_string());
+    lines.push("import { validateDto } from \"../dto/_shared.ts\";".to_string());
     lines.push(String::new());
 
     // Class definition
@@ -175,8 +174,8 @@ fn generate_param_validation(param: &crate::analyzer::ParamInfo, method_name: &s
         }
         TypeRef::Dto(dto_name) => {
             format!(
-                "    const {}Errors = await validate(plainToInstance({}, {}));\n    if ({}Errors.length > 0) throw new Error(`Invalid {}: ${{{}Errors.map(e => Object.values(e.constraints || {{}}).join(\", \")).join(\"; \")}}`);",
-                param.name, dto_name, param.name, param.name, dto_name, param.name
+                "    await validateDto(new {}({}));",
+                dto_name, param.name
             )
         }
         TypeRef::Custom(_) => {
@@ -283,7 +282,7 @@ mod tests {
 
         let output = generate_impure_class_code(&noun);
 
-        assert!(output.contains("validate(plainToInstance(IdDto, dto))"));
+        assert!(output.contains("await validateDto(new IdDto(dto))"));
     }
 
     #[test]
