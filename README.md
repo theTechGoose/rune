@@ -5,7 +5,7 @@
 <h1 align="center">Rune</h1>
 
 <p align="center">
-  Language server and syntax highlighting for <strong>reqspec</strong> requirement specification files.
+  Language server and syntax highlighting for requirement specification files.
 </p>
 
 ## Syntax
@@ -52,14 +52,14 @@ The installer builds the LSP and parser, then prompts you to configure your edit
 
 | Capture | Color | Hex |
 |---------|-------|-----|
-| `@reqspec.tag` | muted teal | `#89babf` |
-| `@reqspec.noun` | sage | `#8a9e7a` |
-| `@reqspec.verb` | dusty mauve | `#9e8080` |
-| `@reqspec.dto` | moss | `#8fb86e` |
-| `@reqspec.builtin` | cream | `#eeeeee` |
-| `@reqspec.boundary` | rosewood | `#b38585` |
-| `@reqspec.fault` | terracotta | `#c9826a` |
-| `@reqspec.comment` | warm gray | `#7a7070` |
+| `@rune.tag` | muted teal | `#89babf` |
+| `@rune.noun` | sage | `#8a9e7a` |
+| `@rune.verb` | dusty mauve | `#9e8080` |
+| `@rune.dto` | moss | `#8fb86e` |
+| `@rune.builtin` | cream | `#eeeeee` |
+| `@rune.boundary` | rosewood | `#b38585` |
+| `@rune.fault` | terracotta | `#c9826a` |
+| `@rune.comment` | warm gray | `#7a7070` |
 
 ## Editors
 

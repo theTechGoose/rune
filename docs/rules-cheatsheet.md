@@ -1,4 +1,4 @@
-# Reqspec Cheatsheet
+# Rune Cheatsheet
 
 ## Structure
 
