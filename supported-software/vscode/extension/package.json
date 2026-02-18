@@ -14,7 +14,11 @@
       "id": "rune",
       "aliases": ["Rune"],
       "extensions": [".rune"],
-      "configuration": "./language-configuration.json"
+      "configuration": "./language-configuration.json",
+      "icon": {
+        "light": "./icons/rune-light.svg",
+        "dark": "./icons/rune-dark.svg"
+      }
     }],
     "configurationDefaults": {
       "editor.semanticHighlighting.enabled": true,

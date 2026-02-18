@@ -1,0 +1,12 @@
+{
+  // Rune icon configuration for A File Icon package
+  // Install A File Icon from Package Control, then merge this into your settings
+
+  "icons": {
+    "rune": {
+      "icon": "ᚱ",
+      "color": "#89babf",
+      "syntaxes": ["Packages/Rune/Rune.sublime-syntax"]
+    }
+  }
+}

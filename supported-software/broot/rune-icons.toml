@@ -1,0 +1,9 @@
+# Rune file icon - add to [verbs] section in conf.toml or conf.hjson
+# Or enable icons_theme and add to icons.toml
+
+[ext-colors]
+rune = "rgb(137, 186, 191)"
+
+# Icon mapping (if using icon theme)
+[ext-icons]
+rune = "ᚱ"
