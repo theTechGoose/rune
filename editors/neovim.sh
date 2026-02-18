@@ -23,8 +23,8 @@ echo "  ✓ Queries installed"
 mkdir -p "$NVIM_CONFIG/after/ftdetect"
 cat > "$NVIM_CONFIG/after/ftdetect/rune.lua" << 'EOF'
 vim.filetype.add({
-  filename = { ["requirements"] = "rune" },
-  pattern = { [".*/requirements$"] = "rune" },
+  filename = { [".rune"] = "rune" },
+  pattern = { [".*%.rune$"] = "rune" },
 })
 EOF
 echo "  ✓ Filetype detection configured"

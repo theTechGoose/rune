@@ -79,7 +79,7 @@ cat << 'EOF'
          "Rune": { "language_servers": ["rune"] }
        },
        "file_types": {
-         "Rune": ["requirements"]
+         "Rune": [.rune]
        }
      }
 EOF

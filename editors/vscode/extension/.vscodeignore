@@ -1,0 +1,11 @@
+src/**
+.gitignore
+tsconfig.json
+*.ts
+*.vsix
+node_modules/.package-lock.json
+node_modules/**/test/**
+node_modules/**/tests/**
+node_modules/**/*.md
+node_modules/**/*.ts
+node_modules/**/LICENSE

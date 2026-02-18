@@ -32,7 +32,7 @@ else
 [[language]]
 name = "rune"
 scope = "source.rune"
-file-types = [{ glob = "requirements" }]
+file-types = [{ glob = .rune }]
 roots = []
 language-servers = ["rune"]
 grammar = "rune"

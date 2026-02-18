@@ -1,0 +1,47 @@
+{
+  "name": "rune",
+  "displayName": "Rune",
+  "description": "Tree-sitter powered syntax highlighting for Rune specification files",
+  "version": "0.1.0",
+  "publisher": "thetechgoose",
+  "repository": "https://github.com/theTechGoose/rune",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:rune"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [{
+      "id": "rune",
+      "aliases": ["Rune"],
+      "extensions": [".rune"],
+      "configuration": "./language-configuration.json"
+    }],
+    "configurationDefaults": {
+      "editor.semanticHighlighting.enabled": true,
+      "editor.semanticTokenColorCustomizations": {
+        "rules": {
+          "keyword": "#89babf",
+          "type": "#8a9e7a",
+          "function": "#9e8080",
+          "variable": "#8fb86e",
+          "string": "#c9826a",
+          "comment": "#7a7070"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --allow-missing-repository"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.26.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  }
+}
