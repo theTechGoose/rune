@@ -7,7 +7,7 @@ pub fn generate_dto_code(dto: &DtoInfo) -> String {
     let mut lines = Vec::new();
 
     // Imports
-    lines.push("import { IsString, IsNumber, IsBoolean, IsArray, ValidateNested, IsOptional, validate } from \"class-validator\";".to_string());
+    lines.push("import { IsString, IsNumber, IsBoolean, IsArray, ValidateNested, IsOptional } from \"class-validator\";".to_string());
     lines.push("import { Type, plainToInstance } from \"class-transformer\";".to_string());
     lines.push(String::new());
 
@@ -17,30 +17,37 @@ pub fn generate_dto_code(dto: &DtoInfo) -> String {
     }
     lines.push(format!("export class {} {{", dto.name));
 
+    // Constructor that uses plainToInstance
+    lines.push(format!("  constructor(input: Partial<{}>) {{", dto.name));
+    lines.push(format!("    Object.assign(this, plainToInstance({}, input));", dto.name));
+    lines.push("  }".to_string());
+    lines.push(String::new());
+
     // Properties with decorators
     for prop in &dto.properties {
         let (decorator, ts_type) = get_decorator_and_type(prop);
 
         if prop.is_array {
-            lines.push(format!("  @IsArray()"));
+            lines.push("  @IsArray()".to_string());
             lines.push(format!("  @{}({{ each: true }})", decorator.trim_start_matches('@').trim_end_matches("()")));
         } else {
             lines.push(format!("  {}", decorator));
         }
 
         if matches!(prop.type_ref, TypeRef::Dto(_)) {
-            lines.push(format!("  @ValidateNested()"));
+            lines.push("  @ValidateNested()".to_string());
             if let TypeRef::Dto(dto_name) = &prop.type_ref {
                 lines.push(format!("  @Type(() => {})", dto_name));
             }
         }
 
         let prop_name = get_property_name(prop);
-        if prop.is_array {
-            lines.push(format!("  {}: {}[];", prop_name, ts_type));
+        let declare = if prop.is_array {
+            format!("  {}!: {}[];", prop_name, ts_type)
         } else {
-            lines.push(format!("  {}: {};", prop_name, ts_type));
-        }
+            format!("  {}!: {};", prop_name, ts_type)
+        };
+        lines.push(declare);
         lines.push(String::new());
     }
 
@@ -50,19 +57,22 @@ pub fn generate_dto_code(dto: &DtoInfo) -> String {
     }
 
     lines.push("}".to_string());
-    lines.push(String::new());
-
-    // Validation function
-    lines.push(format!("export async function validate{}(plain: unknown): Promise<{}> {{", dto.name, dto.name));
-    lines.push(format!("  const instance = plainToInstance({}, plain);", dto.name));
-    lines.push("  const errors = await validate(instance);".to_string());
-    lines.push("  if (errors.length > 0) {".to_string());
-    lines.push(format!("    throw new Error(`Validation failed for {}: ${{errors.map(e => Object.values(e.constraints || {{}}).join(\", \")).join(\"; \")}}`);", dto.name));
-    lines.push("  }".to_string());
-    lines.push("  return instance;".to_string());
-    lines.push("}".to_string());
 
     lines.join("\n")
+}
+
+/// Generate shared validation utilities file
+pub fn generate_shared_code() -> String {
+    r#"import { validate } from "class-validator";
+
+export async function validateDto<T extends object>(instance: T): Promise<T> {
+  const errors = await validate(instance);
+  if (errors.length > 0) {
+    const name = instance.constructor.name;
+    throw new Error(`Validation failed for ${name}: ${errors.map(e => Object.values(e.constraints || {}).join(", ")).join("; ")}`);
+  }
+  return instance;
+}"#.to_string()
 }
 
 /// Get class-validator decorator and TypeScript type for a property
@@ -107,7 +117,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn generates_dto_with_validation() {
+    fn generates_dto_with_constructor() {
         let dto = DtoInfo {
             name: "GetRecordingDto".to_string(),
             kebab_name: "get-recording-dto".to_string(),
@@ -129,9 +139,11 @@ mod tests {
         let output = generate_dto_code(&dto);
 
         assert!(output.contains("class GetRecordingDto"));
+        assert!(output.contains("constructor(input: Partial<GetRecordingDto>)"));
+        assert!(output.contains("Object.assign(this, plainToInstance(GetRecordingDto, input))"));
         assert!(output.contains("@IsString()"));
-        assert!(output.contains("providerName: providerName"));
-        assert!(output.contains("externalId: externalId"));
+        assert!(output.contains("providerName!: providerName"));
+        assert!(output.contains("externalId!: externalId"));
     }
 
     #[test]
@@ -152,7 +164,7 @@ mod tests {
         let output = generate_dto_code(&dto);
 
         assert!(output.contains("@IsArray()"));
-        assert!(output.contains("urls: url[]"));
+        assert!(output.contains("urls!: url[]"));
     }
 
     #[test]
@@ -177,18 +189,11 @@ mod tests {
     }
 
     #[test]
-    fn generates_validation_function() {
-        let dto = DtoInfo {
-            name: "IdDto".to_string(),
-            kebab_name: "id-dto".to_string(),
-            properties: vec![],
-            description: "id output".to_string(),
-        };
+    fn generates_shared_validate_function() {
+        let output = generate_shared_code();
 
-        let output = generate_dto_code(&dto);
-
-        assert!(output.contains("export async function validateIdDto"));
-        assert!(output.contains("plainToInstance(IdDto, plain)"));
+        assert!(output.contains("export async function validateDto<T extends object>"));
+        assert!(output.contains("const errors = await validate(instance)"));
     }
 
     #[test]

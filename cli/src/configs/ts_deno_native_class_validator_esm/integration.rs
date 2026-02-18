@@ -12,8 +12,9 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
     lines.push(String::new());
 
     // Core function (pure inner function - the seam)
-    let core_fn_name = format!("{}Core", req.verb);
-    lines.push(format!("/** Pure core function for {} - the seam between pure and impure */", req.verb));
+    let core_fn_name = format!("{}{}Core", req.verb, capitalize(&req.noun));
+    let outer_fn_name = format!("{}{}", req.verb, capitalize(&req.noun));
+    lines.push(format!("/** Pure core function for {} - the seam between pure and impure */", outer_fn_name));
     lines.push(format!("export function {}(", core_fn_name));
 
     // Core params: what pure functions need from impure functions
@@ -37,8 +38,8 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
     lines.push(String::new());
 
     // Outer function (matches REQ spec exactly)
-    lines.push(format!("/** {} - orchestrates boundary calls and core logic */", req.verb));
-    lines.push(format!("export async function {}(input: {}): Promise<{}> {{", req.verb, req.input_dto, req.output_dto));
+    lines.push(format!("/** {} - orchestrates boundary calls and core logic */", outer_fn_name));
+    lines.push(format!("export async function {}(input: {}): Promise<{}> {{", outer_fn_name, req.input_dto, req.output_dto));
 
     // Outer body: instantiate boundary classes, call core, execute side effects
     lines.push("  // TODO: implement orchestration".to_string());
@@ -75,23 +76,31 @@ pub fn generate_integration_code(req: &ReqInfo) -> String {
 pub fn generate_integration_test_code(req: &ReqInfo) -> String {
     let mut lines = Vec::new();
 
-    let core_fn_name = format!("{}Core", req.verb);
+    let core_fn_name = format!("{}{}Core", req.verb, capitalize(&req.noun));
 
     lines.push(format!("import {{ {} }} from \"./{}-{}.ts\";", core_fn_name, req.noun, req.verb));
+    lines.push("import { assertEquals, assertThrows } from \"@std/assert\";".to_string());
     lines.push(String::new());
 
     // Happy path test
     let test_name = format!("{} {} happy path", req.noun, req.verb);
     lines.push(format!("Deno.test(\"{}\", () => {{", test_name));
-    lines.push("  // TODO: implement test".to_string());
+    lines.push(format!("  // const result = {}(/* TODO: provide test inputs */);", core_fn_name));
+    lines.push("  // assertEquals(result.someField, expectedValue);".to_string());
+    lines.push("  throw new Error(\"Test not implemented\");".to_string());
     lines.push("});".to_string());
 
-    // Fault tests
+    // Fault tests (deduplicated)
+    let mut seen_faults: std::collections::HashSet<String> = std::collections::HashSet::new();
     for fault in &req.all_faults {
+        if seen_faults.contains(fault) {
+            continue;
+        }
+        seen_faults.insert(fault.clone());
         lines.push(String::new());
         let fault_test_name = format!("{} {} handles {}", req.noun, req.verb, fault);
         lines.push(format!("Deno.test(\"{}\", () => {{", fault_test_name));
-        lines.push("  // TODO: implement test".to_string());
+        lines.push(format!("  assertThrows(() => {}(/* TODO: inputs that trigger {} */), Error);", core_fn_name, fault));
         lines.push("});".to_string());
     }
 
@@ -227,8 +236,8 @@ mod tests {
         let req = make_test_req();
         let output = generate_integration_code(&req);
 
-        assert!(output.contains("export function registerCore("));
-        assert!(output.contains("export async function register("));
+        assert!(output.contains("export function registerRecordingCore("));
+        assert!(output.contains("export async function registerRecording("));
     }
 
     #[test]
@@ -253,7 +262,7 @@ mod tests {
         let req = make_test_req();
         let output = generate_integration_test_code(&req);
 
-        assert!(output.contains("import { registerCore }"));
+        assert!(output.contains("import { registerRecordingCore }"));
         assert!(output.contains("Deno.test(\"recording register happy path\""));
     }
 

@@ -37,6 +37,9 @@ pub trait Generator {
 
     /// Generate integration tests
     fn generate_integration_test(&self, req: &ReqInfo) -> String;
+
+    /// Generate shared utilities (like validateDto)
+    fn generate_shared(&self) -> String;
 }
 
 #[cfg(test)]

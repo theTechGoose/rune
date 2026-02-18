@@ -70,13 +70,23 @@ pub fn generate_impure_test_code(noun: &NounInfo) -> String {
     let mut lines = Vec::new();
 
     lines.push(format!("import {{ {} }} from \"./{}.ts\";", noun.pascal_name, noun.name));
+    lines.push("import { assertEquals, assertRejects } from \"@std/assert\";".to_string());
     lines.push(String::new());
 
     // Happy path tests for each method
     for method in &noun.methods {
         let test_name = format!("{} {} happy path", noun.pascal_name, method.name);
         lines.push(format!("Deno.test(\"{}\", async () => {{", test_name));
-        lines.push("  // TODO: implement test".to_string());
+
+        // Generate test body
+        lines.push(format!("  // const instance = new {}(/* TODO: constructor args */);", noun.pascal_name));
+        if method.boundary.is_some() {
+            lines.push(format!("  // const result = await instance.{}(/* TODO: provide test inputs */);", method.name));
+        } else {
+            lines.push(format!("  // const result = instance.{}(/* TODO: provide test inputs */);", method.name));
+        }
+        lines.push("  // assertEquals(result, expectedValue);".to_string());
+        lines.push("  throw new Error(\"Test not implemented\");".to_string());
         lines.push("});".to_string());
         lines.push(String::new());
 
@@ -84,7 +94,12 @@ pub fn generate_impure_test_code(noun: &NounInfo) -> String {
         for fault in &method.faults {
             let fault_test_name = format!("{} {} throws on {}", noun.pascal_name, method.name, fault);
             lines.push(format!("Deno.test(\"{}\", async () => {{", fault_test_name));
-            lines.push("  // TODO: implement test".to_string());
+            lines.push(format!("  // const instance = new {}(/* TODO: constructor args */);", noun.pascal_name));
+            if method.boundary.is_some() {
+                lines.push(format!("  await assertRejects(() => instance.{}(/* TODO: inputs that trigger {} */), Error);", method.name, fault));
+            } else {
+                lines.push(format!("  assertThrows(() => instance.{}(/* TODO: inputs that trigger {} */), Error);", method.name, fault));
+            }
             lines.push("});".to_string());
             lines.push(String::new());
         }
@@ -320,5 +335,6 @@ mod tests {
 
         assert!(output.contains("Deno.test(\"Storage save happy path\", async"));
         assert!(output.contains("Deno.test(\"Storage save throws on timed-out\""));
+        assert!(output.contains("import { assertEquals, assertRejects }"));
     }
 }

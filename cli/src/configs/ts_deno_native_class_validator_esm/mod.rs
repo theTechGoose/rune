@@ -70,6 +70,10 @@ impl Generator for TsDenoNativeClassValidatorEsm {
     fn generate_integration_test(&self, req: &ReqInfo) -> String {
         generate_integration_test_code(req)
     }
+
+    fn generate_shared(&self) -> String {
+        generate_shared_code()
+    }
 }
 
 #[cfg(test)]

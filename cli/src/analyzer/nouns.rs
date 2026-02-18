@@ -105,8 +105,11 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
 
         let is_impure = !boundary_types.is_empty();
 
+        // Deduplicate methods by (name, is_static, boundary) signature
+        let unique_methods = deduplicate_methods(methods);
+
         // Infer constructor params: params that appear in multiple methods
-        let constructor_params = infer_constructor_params(&methods);
+        let constructor_params = infer_constructor_params(&unique_methods);
 
         nouns.push(NounInfo {
             pascal_name: to_pascal_case(&name),
@@ -114,7 +117,7 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
             is_impure,
             boundary_types,
             constructor_params,
-            methods,
+            methods: unique_methods,
         });
     }
 
@@ -122,6 +125,22 @@ pub fn extract_nouns(lines: &[ParsedLine]) -> Vec<NounInfo> {
     nouns.sort_by(|a, b| a.name.cmp(&b.name));
 
     nouns
+}
+
+/// Deduplicate methods by (name, is_static, boundary) signature
+fn deduplicate_methods(methods: Vec<MethodInfo>) -> Vec<MethodInfo> {
+    let mut seen: HashSet<(String, bool, Option<String>)> = HashSet::new();
+    let mut unique = Vec::new();
+
+    for method in methods {
+        let key = (method.name.clone(), method.is_static, method.boundary.clone());
+        if !seen.contains(&key) {
+            seen.insert(key);
+            unique.push(method);
+        }
+    }
+
+    unique
 }
 
 /// Infer constructor parameters: params that appear in multiple methods

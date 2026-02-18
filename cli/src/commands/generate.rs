@@ -51,6 +51,12 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
     fs::create_dir_all(dist_dir.join("integration"))
         .map_err(|e| format!("Failed to create integration directory: {}", e))?;
 
+    // Generate shared utilities
+    let shared_content = generator.generate_shared();
+    let shared_path = dist_dir.join("dto").join(format!("_shared.{}", ext));
+    fs::write(&shared_path, shared_content)
+        .map_err(|e| format!("Failed to write {}: {}", shared_path.display(), e))?;
+
     // Generate DTOs
     for dto in &spec.dtos {
         let content = generator.generate_dto(dto);
