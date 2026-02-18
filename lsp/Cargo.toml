@@ -1,10 +1,11 @@
 [package]
-name = "rune"
+name = "rune-lsp"
 version = "0.1.0"
 edition = "2024"
 description = "Lightning-fast LSP for rune files"
 
 [dependencies]
+rune-parser = { path = "../parser" }
 tower-lsp = "0.20"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

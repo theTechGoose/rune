@@ -3,7 +3,13 @@ grammar/node_modules/
 grammar/*.dylib
 grammar/*.so
 grammar/*.wasm
+target/
 lsp/target/
+parser/target/
+cli/target/
+
+# Generated output
+dist.rune/
 
 # Editor
 .DS_Store

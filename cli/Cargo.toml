@@ -1,0 +1,16 @@
+[package]
+name = "rune-cli"
+version = "0.1.0"
+edition = "2024"
+description = "CLI for generating scaffolded code from .rune specs"
+
+[[bin]]
+name = "rune"
+path = "src/main.rs"
+
+[dependencies]
+rune-parser = { path = "../parser" }
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"

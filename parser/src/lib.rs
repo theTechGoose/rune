@@ -529,7 +529,8 @@ fn is_fault_name(s: &str) -> bool {
 /// e.g., "url(s)" -> ("url", "s")
 /// e.g., "address(es)" -> ("address", "es")
 /// e.g., "child(ren)" -> ("child", "ren")
-fn parse_array_property(s: &str) -> Option<(String, String)> {
+#[allow(dead_code)]
+pub fn parse_array_property(s: &str) -> Option<(String, String)> {
     let open_paren = s.find('(')?;
     let close_paren = s.find(')')?;
 

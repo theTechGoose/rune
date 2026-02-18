@@ -6,9 +6,7 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-mod parser;
-
-use parser::{parse_document, LineKind};
+use rune_parser::{parse_document, LineKind};
 
 #[derive(Debug)]
 struct Backend {
