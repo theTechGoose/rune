@@ -73,32 +73,6 @@
     }
   },
   {
-    "type": "ctr_step",
-    "named": true,
-    "fields": {
-      "class": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "ctr_tag",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "dto_array_prop",
     "named": true,
     "fields": {},
@@ -150,11 +124,15 @@
     "named": true,
     "fields": {},
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
           "type": "dto_array_prop",
+          "named": true
+        },
+        {
+          "type": "dto_optional_marker",
           "named": true
         },
         {
@@ -187,21 +165,6 @@
     "type": "dto_reference",
     "named": true,
     "fields": {}
-  },
-  {
-    "type": "fault_line",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": true,
-      "required": true,
-      "types": [
-        {
-          "type": "fault_name",
-          "named": true
-        }
-      ]
-    }
   },
   {
     "type": "generic_type",
@@ -237,6 +200,58 @@
       "types": [
         {
           "type": "dto_property",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "new_step",
+    "named": true,
+    "fields": {
+      "class": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "new_tag",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "non_definition",
+    "named": true,
+    "fields": {
+      "noun": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "non_tag",
           "named": true
         }
       ]
@@ -311,6 +326,10 @@
       "required": true,
       "types": [
         {
+          "type": "req_signature",
+          "named": true
+        },
+        {
           "type": "req_tag",
           "named": true
         },
@@ -320,6 +339,32 @@
         },
         {
           "type": "signature",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "req_signature",
+    "named": true,
+    "fields": {
+      "function": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "function_name",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "parameters",
           "named": true
         }
       ]
@@ -429,10 +474,6 @@
           "named": true
         },
         {
-          "type": "ctr_step",
-          "named": true
-        },
-        {
           "type": "dto_definition",
           "named": true
         },
@@ -442,6 +483,18 @@
         },
         {
           "type": "fault_line",
+          "named": true
+        },
+        {
+          "type": "new_step",
+          "named": true
+        },
+        {
+          "type": "non_definition",
+          "named": true
+        },
+        {
+          "type": "non_desc",
           "named": true
         },
         {
@@ -514,6 +567,21 @@
     }
   },
   {
+    "type": "typ_enum_type",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "typ_enum_value",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "typ_generic_type",
     "named": true,
     "fields": {},
@@ -560,6 +628,10 @@
       "multiple": false,
       "required": true,
       "types": [
+        {
+          "type": "typ_enum_type",
+          "named": true
+        },
         {
           "type": "typ_generic_type",
           "named": true
@@ -653,10 +725,6 @@
     "named": true
   },
   {
-    "type": "ctr_tag",
-    "named": true
-  },
-  {
     "type": "db:",
     "named": false
   },
@@ -669,6 +737,10 @@
     "named": true
   },
   {
+    "type": "dto_optional_marker",
+    "named": true
+  },
+  {
     "type": "dto_tag",
     "named": true
   },
@@ -677,12 +749,16 @@
     "named": false
   },
   {
-    "type": "fault_name",
+    "type": "fault_line",
     "named": true
   },
   {
     "type": "fs:",
     "named": false
+  },
+  {
+    "type": "function_name",
+    "named": true
   },
   {
     "type": "lg:",
@@ -695,6 +771,18 @@
   {
     "type": "mq:",
     "named": false
+  },
+  {
+    "type": "new_tag",
+    "named": true
+  },
+  {
+    "type": "non_desc",
+    "named": true
+  },
+  {
+    "type": "non_tag",
+    "named": true
   },
   {
     "type": "os:",
@@ -714,6 +802,10 @@
   },
   {
     "type": "typ_desc",
+    "named": true
+  },
+  {
+    "type": "typ_enum_value",
     "named": true
   },
   {

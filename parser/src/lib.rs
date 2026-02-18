@@ -75,6 +75,13 @@ pub enum LineKind {
         text: String,
         indent: usize,
     },
+    NonDef {
+        name: String,
+    },
+    NonDesc {
+        text: String,
+        indent: usize,
+    },
     MultilineContinuation {
         expected_indent: usize,
         actual_indent: usize,
@@ -87,7 +94,7 @@ pub enum LineKind {
         value: String,
         indent: usize,
     },
-    Ctr {
+    New {
         class_name: String,
         indent: usize,
     },
@@ -99,6 +106,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
     let mut results = Vec::new();
     let mut in_dto_block = false;
     let mut in_typ_block = false;
+    let mut in_non_block = false;
     let mut in_multiline_step = false;
     let mut paren_depth: i32 = 0;
     let mut multiline_indent: usize = 0;
@@ -133,6 +141,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
         if trimmed.is_empty() {
             in_dto_block = false;
             in_typ_block = false;
+            in_non_block = false;
             in_multiline_step = false;
             paren_depth = 0;
             multiline_indent = 0;
@@ -165,6 +174,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
         if trimmed.starts_with("[REQ]") {
             in_dto_block = false;
             in_typ_block = false;
+            in_non_block = false;
             if let Some((noun, verb, input, output)) = parse_req_signature(&trimmed[5..]) {
                 results.push(ParsedLine { line_num, kind: LineKind::Req { noun, verb, input, output, indent: actual_indent } });
             } else {
@@ -177,6 +187,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
         if trimmed.starts_with("[DTO]") {
             in_dto_block = true;
             in_typ_block = false;
+            in_non_block = false;
             let rest = trimmed[5..].trim();
             if let Some(colon_pos) = rest.find(':') {
                 let name = rest[..colon_pos].trim().to_string();
@@ -197,6 +208,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
         if trimmed.starts_with("[TYP]") {
             in_dto_block = false;
             in_typ_block = true;
+            in_non_block = false;
             let rest = trimmed[5..].trim();
             if let Some(colon_pos) = rest.find(':') {
                 let name = rest[..colon_pos].trim().to_string();
@@ -205,6 +217,32 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
             } else {
                 results.push(ParsedLine { line_num, kind: LineKind::Unknown("[TYP] missing type".to_string()) });
             }
+            continue;
+        }
+
+        // [NON] definition
+        if trimmed.starts_with("[NON]") {
+            in_dto_block = false;
+            in_typ_block = false;
+            in_non_block = true;
+            let name = trimmed[5..].trim().to_string();
+            if !name.is_empty() {
+                results.push(ParsedLine { line_num, kind: LineKind::NonDef { name } });
+            } else {
+                results.push(ParsedLine { line_num, kind: LineKind::Unknown("[NON] missing name".to_string()) });
+            }
+            continue;
+        }
+
+        // NON description line (4-space indent, plain text after [NON])
+        if in_non_block && actual_indent == 4 && !trimmed.contains('.') && !trimmed.starts_with('[') {
+            results.push(ParsedLine {
+                line_num,
+                kind: LineKind::NonDesc {
+                    text: trimmed.to_string(),
+                    indent: actual_indent,
+                },
+            });
             continue;
         }
 
@@ -346,13 +384,13 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
             continue;
         }
 
-        // [CTR] class constructor shorthand
-        if trimmed.starts_with("[CTR]") {
+        // [NEW] class constructor shorthand
+        if trimmed.starts_with("[NEW]") {
             let class_name = trimmed[5..].trim().to_string();
             if !class_name.is_empty() {
                 results.push(ParsedLine {
                     line_num,
-                    kind: LineKind::Ctr {
+                    kind: LineKind::New {
                         class_name,
                         indent: actual_indent,
                     },
@@ -360,7 +398,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
             } else {
                 results.push(ParsedLine {
                     line_num,
-                    kind: LineKind::Unknown("[CTR] missing class name".to_string()),
+                    kind: LineKind::Unknown("[NEW] missing class name".to_string()),
                 });
             }
             continue;
@@ -383,8 +421,7 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
             }
         }
 
-        // Fault line (space-separated hyphenated names, indented)
-        // Faults must contain at least one hyphen to distinguish from identifiers
+        // Fault line (space-separated fault names, indented)
         if actual_indent >= 6 {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             let all_faults = !parts.is_empty() && parts.iter().all(|p| is_fault_name(p));
@@ -463,23 +500,39 @@ fn parse_req_signature(s: &str) -> Option<(String, String, String, String)> {
     let paren_close = s.find(')')?;
     let colon_pos = s.rfind(':')?;
 
-    // Find separator: either :: (static) or . (instance)
-    let (sep_pos, sep_len) = if let Some(pos) = s[..paren_open].find("::") {
-        (pos, 2)
-    } else if let Some(pos) = s[..paren_open].find('.') {
-        (pos, 1)
-    } else {
-        return None;
-    };
-
-    if sep_pos >= paren_open || paren_open >= paren_close || paren_close >= colon_pos {
+    if paren_open >= paren_close || paren_close >= colon_pos {
         return None;
     }
 
-    let noun = s[..sep_pos].trim().to_string();
-    let verb = s[sep_pos + sep_len..paren_open].trim().to_string();
     let input = s[paren_open + 1..paren_close].trim().to_string();
     let output = s[colon_pos + 1..].trim().to_string();
+
+    // Find separator: either :: (static) or . (instance)
+    let name_part = &s[..paren_open];
+    let (noun, verb) = if let Some(pos) = name_part.find("::") {
+        let noun = name_part[..pos].trim().to_string();
+        let verb = name_part[pos + 2..].trim().to_string();
+        (noun, verb)
+    } else if let Some(pos) = name_part.find('.') {
+        let noun = name_part[..pos].trim().to_string();
+        let verb = name_part[pos + 1..].trim().to_string();
+        (noun, verb)
+    } else {
+        // camelCase format: verbNoun -> split at first uppercase after start
+        let name = name_part.trim();
+        if let Some(split_pos) = name.chars().skip(1).position(|c| c.is_uppercase()) {
+            let split_pos = split_pos + 1; // adjust for skip(1)
+            let verb = name[..split_pos].to_string();
+            let noun_part = &name[split_pos..];
+            // lowercase the first letter of noun for consistency
+            let noun = noun_part.chars().next()
+                .map(|c| c.to_lowercase().to_string() + &noun_part[c.len_utf8()..])
+                .unwrap_or_default();
+            (noun, verb)
+        } else {
+            return None;
+        }
+    };
 
     if noun.is_empty() || verb.is_empty() {
         return None;
@@ -518,9 +571,8 @@ fn parse_partial_signature(s: &str) -> Option<(String, String, Vec<String>, Stri
 }
 
 fn is_fault_name(s: &str) -> bool {
-    // Fault names must contain at least one hyphen to distinguish from identifiers
+    // Fault names: lowercase alphanumeric with optional hyphens
     !s.is_empty()
-        && s.contains('-')
         && s.chars().all(|c| c.is_lowercase() || c.is_numeric() || c == '-')
         && s.chars().next().map(|c| c.is_lowercase()).unwrap_or(false)
 }
@@ -704,16 +756,31 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_ctr_shorthand() {
-        let doc = "    [CTR] metadata";
+    fn test_parse_new_shorthand() {
+        let doc = "    [NEW] metadata";
         let lines = parse_document(doc);
-        assert!(matches!(&lines[0].kind, LineKind::Ctr { class_name, indent: 4 } if class_name == "metadata"));
+        assert!(matches!(&lines[0].kind, LineKind::New { class_name, indent: 4 } if class_name == "metadata"));
     }
 
     #[test]
-    fn test_parse_ctr_storage() {
-        let doc = "    [CTR] storage";
+    fn test_parse_new_storage() {
+        let doc = "    [NEW] storage";
         let lines = parse_document(doc);
-        assert!(matches!(&lines[0].kind, LineKind::Ctr { class_name, indent: 4 } if class_name == "storage"));
+        assert!(matches!(&lines[0].kind, LineKind::New { class_name, indent: 4 } if class_name == "storage"));
+    }
+
+    #[test]
+    fn test_parse_non_def() {
+        let doc = "[NON] storage";
+        let lines = parse_document(doc);
+        assert!(matches!(&lines[0].kind, LineKind::NonDef { name } if name == "storage"));
+    }
+
+    #[test]
+    fn test_parse_non_with_description() {
+        let doc = "[NON] storage\n    a storage system";
+        let lines = parse_document(doc);
+        assert!(matches!(&lines[0].kind, LineKind::NonDef { name } if name == "storage"));
+        assert!(matches!(&lines[1].kind, LineKind::NonDesc { text, .. } if text == "a storage system"));
     }
 }

@@ -6,7 +6,7 @@ module.exports = grammar({
 
   extras: ($) => [/ /, /\t/, $.comment],
 
-  externals: ($) => [$.typ_desc, $.dto_desc],
+  externals: ($) => [$.typ_desc, $.dto_desc, $.non_desc, $.fault_line],
 
   rules: {
     source_file: ($) => repeat(choice($._line, /\r?\n/)),
@@ -18,13 +18,15 @@ module.exports = grammar({
         $.step_line,
         $.ply_step,
         $.cse_step,
-        $.ctr_step,
+        $.new_step,
         $.ret_step,
         $.fault_line,
         $.dto_definition,
         $.typ_definition,
+        $.non_definition,
         $.typ_desc,
-        $.dto_desc
+        $.dto_desc,
+        $.non_desc
       ),
 
     // Polymorphic step: [PLY] noun.verb(args): returnType
@@ -47,14 +49,14 @@ module.exports = grammar({
 
     cse_tag: ($) => "[CSE]",
 
-    // Constructor shorthand: [CTR] class
-    ctr_step: ($) =>
+    // Constructor shorthand: [NEW] class
+    new_step: ($) =>
       seq(
-        $.ctr_tag,
+        $.new_tag,
         field("class", $.identifier)
       ),
 
-    ctr_tag: ($) => "[CTR]",
+    new_tag: ($) => "[NEW]",
 
     // Built-in return step: [RET] value
     ret_step: ($) =>
@@ -71,19 +73,25 @@ module.exports = grammar({
     // DTO reference (ends in Dto) - declare first for lexer priority
     dto_reference: ($) => /[A-Za-z_][A-Za-z0-9_]*Dto/,
 
-    // Fault name (lowercase, must contain at least one hyphen)
-    fault_name: ($) => /[a-z][a-z0-9]*-[a-z0-9]+(-[a-z0-9]+)*/,
-
-    // [REQ] noun.verb(args): returnType
+    // [REQ] verbNoun(args): returnType or [REQ] noun.verb(args): returnType
     req_line: ($) =>
       seq(
         $.req_tag,
-        $.signature,
+        choice($.req_signature, $.signature),
         ":",
         $.return_type
       ),
 
     req_tag: ($) => "[REQ]",
+
+    // camelCase function name: verbNoun(args)
+    req_signature: ($) =>
+      seq(
+        field("function", $.function_name),
+        $.parameters
+      ),
+
+    function_name: ($) => /[a-z][a-zA-Z0-9]*/,
 
     // noun.verb(args) or Noun::verb(args)
     signature: ($) =>
@@ -211,13 +219,18 @@ module.exports = grammar({
 
     dto_def_name: ($) => /[A-Za-z_][A-Za-z0-9_]*Dto/,
 
-    // DTO property: simple name or array syntax like url(s)
+    // DTO property: simple name, array syntax, or DTO reference, with optional ?
     dto_prop: ($) =>
-      choice(
-        $.dto_array_prop,
-        prec(2, $.dto_reference),
-        $.property_name
+      seq(
+        choice(
+          $.dto_array_prop,
+          prec(2, $.dto_reference),
+          $.property_name
+        ),
+        optional($.dto_optional_marker)
       ),
+
+    dto_optional_marker: ($) => "?",
 
     // Array property: url(s), address(es), child(ren)
     dto_array_prop: ($) =>
@@ -244,11 +257,12 @@ module.exports = grammar({
 
     typ_name: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
 
-    // TYP type can be: simple, generic (Array<T>, Record<K, V>), or tuple [a, b]
+    // TYP type can be: simple, generic, tuple, or string enum
     typ_type: ($) =>
       choice(
         $.typ_generic_type,
         $.typ_tuple_type,
+        $.typ_enum_type,
         prec(1, $.type_name)
       ),
 
@@ -268,11 +282,32 @@ module.exports = grammar({
         "]"
       ),
 
+    // String enum type: "value1" | "value2"
+    typ_enum_type: ($) =>
+      seq(
+        $.typ_enum_value,
+        repeat1(seq("|", $.typ_enum_value))
+      ),
+
+    typ_enum_value: ($) => /"[^"]*"/,
+
     // TYP description line - handled by external scanner
     // Matches 4-space indented prose lines (see src/scanner.c)
 
-    // Fault line: space-separated fault names
-    fault_line: ($) => prec.left(repeat1($.fault_name)),
+    // [NON] nounName - noun declaration
+    non_definition: ($) =>
+      seq(
+        $.non_tag,
+        field("noun", $.identifier)
+      ),
+
+    non_tag: ($) => "[NON]",
+
+    // NON description line - handled by external scanner
+    // Matches 4-space indented prose lines (see src/scanner.c)
+
+    // Fault line: handled by external scanner
+    // Matches 6+ space indented lines with only lowercase words/hyphens/digits
 
     // Identifier for nouns
     identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,

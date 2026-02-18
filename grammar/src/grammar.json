@@ -43,7 +43,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "ctr_step"
+          "name": "new_step"
         },
         {
           "type": "SYMBOL",
@@ -63,11 +63,19 @@
         },
         {
           "type": "SYMBOL",
+          "name": "non_definition"
+        },
+        {
+          "type": "SYMBOL",
           "name": "typ_desc"
         },
         {
           "type": "SYMBOL",
           "name": "dto_desc"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "non_desc"
         }
       ]
     },
@@ -117,12 +125,12 @@
       "type": "STRING",
       "value": "[CSE]"
     },
-    "ctr_step": {
+    "new_step": {
       "type": "SEQ",
       "members": [
         {
           "type": "SYMBOL",
-          "name": "ctr_tag"
+          "name": "new_tag"
         },
         {
           "type": "FIELD",
@@ -134,9 +142,9 @@
         }
       ]
     },
-    "ctr_tag": {
+    "new_tag": {
       "type": "STRING",
-      "value": "[CTR]"
+      "value": "[NEW]"
     },
     "ret_step": {
       "type": "SEQ",
@@ -188,10 +196,6 @@
       "type": "PATTERN",
       "value": "[A-Za-z_][A-Za-z0-9_]*Dto"
     },
-    "fault_name": {
-      "type": "PATTERN",
-      "value": "[a-z][a-z0-9]*-[a-z0-9]+(-[a-z0-9]+)*"
-    },
     "req_line": {
       "type": "SEQ",
       "members": [
@@ -200,8 +204,17 @@
           "name": "req_tag"
         },
         {
-          "type": "SYMBOL",
-          "name": "signature"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "req_signature"
+            },
+            {
+              "type": "SYMBOL",
+              "name": "signature"
+            }
+          ]
         },
         {
           "type": "STRING",
@@ -216,6 +229,27 @@
     "req_tag": {
       "type": "STRING",
       "value": "[REQ]"
+    },
+    "req_signature": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "FIELD",
+          "name": "function",
+          "content": {
+            "type": "SYMBOL",
+            "name": "function_name"
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "parameters"
+        }
+      ]
+    },
+    "function_name": {
+      "type": "PATTERN",
+      "value": "[a-z][a-zA-Z0-9]*"
     },
     "signature": {
       "type": "SEQ",
@@ -771,25 +805,46 @@
       "value": "[A-Za-z_][A-Za-z0-9_]*Dto"
     },
     "dto_prop": {
-      "type": "CHOICE",
+      "type": "SEQ",
       "members": [
         {
-          "type": "SYMBOL",
-          "name": "dto_array_prop"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "dto_array_prop"
+            },
+            {
+              "type": "PREC",
+              "value": 2,
+              "content": {
+                "type": "SYMBOL",
+                "name": "dto_reference"
+              }
+            },
+            {
+              "type": "SYMBOL",
+              "name": "property_name"
+            }
+          ]
         },
         {
-          "type": "PREC",
-          "value": 2,
-          "content": {
-            "type": "SYMBOL",
-            "name": "dto_reference"
-          }
-        },
-        {
-          "type": "SYMBOL",
-          "name": "property_name"
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "dto_optional_marker"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
         }
       ]
+    },
+    "dto_optional_marker": {
+      "type": "STRING",
+      "value": "?"
     },
     "dto_array_prop": {
       "type": "SEQ",
@@ -847,6 +902,10 @@
         {
           "type": "SYMBOL",
           "name": "typ_tuple_type"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "typ_enum_type"
         },
         {
           "type": "PREC",
@@ -924,16 +983,55 @@
         }
       ]
     },
-    "fault_line": {
-      "type": "PREC_LEFT",
-      "value": 0,
-      "content": {
-        "type": "REPEAT1",
-        "content": {
+    "typ_enum_type": {
+      "type": "SEQ",
+      "members": [
+        {
           "type": "SYMBOL",
-          "name": "fault_name"
+          "name": "typ_enum_value"
+        },
+        {
+          "type": "REPEAT1",
+          "content": {
+            "type": "SEQ",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "|"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "typ_enum_value"
+              }
+            ]
+          }
         }
-      }
+      ]
+    },
+    "typ_enum_value": {
+      "type": "PATTERN",
+      "value": "\"[^\"]*\""
+    },
+    "non_definition": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "non_tag"
+        },
+        {
+          "type": "FIELD",
+          "name": "noun",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        }
+      ]
+    },
+    "non_tag": {
+      "type": "STRING",
+      "value": "[NON]"
     },
     "identifier": {
       "type": "PATTERN",
@@ -964,6 +1062,14 @@
     {
       "type": "SYMBOL",
       "name": "dto_desc"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "non_desc"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "fault_line"
     }
   ],
   "inline": [],
