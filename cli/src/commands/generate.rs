@@ -1,15 +1,41 @@
 //! Generate command - generates scaffolded code from .rune specs
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
 use crate::analyzer::{analyze, AnalyzedSpec};
 use crate::configs::{get_generator, Generator};
 
-/// Write content to a file only if it doesn't already exist
-fn write_if_not_exists(path: &Path, content: &str) -> Result<bool, String> {
-    if path.exists() {
-        Ok(false) // File exists, skipped
+/// Recursively scan a directory for all file names (without path)
+fn scan_existing_files(dir: &Path) -> HashSet<String> {
+    let mut files = HashSet::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                // Recurse into subdirectories
+                files.extend(scan_existing_files(&path));
+            } else if let Some(name) = path.file_name() {
+                files.insert(name.to_string_lossy().to_string());
+            }
+        }
+    }
+    files
+}
+
+/// Write content to a file only if a file with that name doesn't exist anywhere in the project
+fn write_if_not_exists_in_project(
+    path: &Path,
+    content: &str,
+    existing_files: &HashSet<String>,
+) -> Result<bool, String> {
+    let file_name = path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    if existing_files.contains(&file_name) {
+        Ok(false) // File exists somewhere in project, skipped
     } else {
         fs::write(path, content)
             .map_err(|e| format!("Failed to write {}: {}", path.display(), e))?;
@@ -41,14 +67,22 @@ pub fn generate(
 
     let dist_dir = base_dir.join("dist.rune");
 
+    // Scan project directory for existing files
+    let existing_files = scan_existing_files(&base_dir);
+
     // Generate all files
-    generate_all(&dist_dir, &spec, generator.as_ref())?;
+    generate_all(&dist_dir, &spec, generator.as_ref(), &existing_files)?;
 
     Ok(())
 }
 
 /// Generate all files in the dist.rune directory structure
-fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator) -> Result<(), String> {
+fn generate_all(
+    dist_dir: &Path,
+    spec: &AnalyzedSpec,
+    generator: &dyn Generator,
+    existing_files: &HashSet<String>,
+) -> Result<(), String> {
     let ext = generator.config().file_extension;
     let test_suffix = generator.config().test_suffix;
 
@@ -77,7 +111,7 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
     for dto in &spec.dtos {
         let content = generator.generate_dto(dto);
         let file_path = dist_dir.join("dto").join(format!("{}.{}", dto.kebab_name, ext));
-        write_if_not_exists(&file_path, &content)?;
+        write_if_not_exists_in_project(&file_path, &content, existing_files)?;
     }
 
     // Generate pure classes (skip polymorphic nouns, skip if exists)
@@ -91,12 +125,12 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             // Generate class (skip if exists)
             let class_content = generator.generate_pure_class(noun);
             let class_path = noun_dir.join(format!("{}.{}", noun.name, ext));
-            write_if_not_exists(&class_path, &class_content)?;
+            write_if_not_exists_in_project(&class_path, &class_content, existing_files)?;
 
             // Generate tests (skip if exists)
             let test_content = generator.generate_pure_test(noun);
             let test_path = noun_dir.join(format!("{}{}.{}", noun.name, test_suffix, ext));
-            write_if_not_exists(&test_path, &test_content)?;
+            write_if_not_exists_in_project(&test_path, &test_content, existing_files)?;
         }
     }
 
@@ -111,12 +145,12 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             // Generate class (skip if exists)
             let class_content = generator.generate_impure_class(noun);
             let class_path = noun_dir.join(format!("{}.{}", noun.name, ext));
-            write_if_not_exists(&class_path, &class_content)?;
+            write_if_not_exists_in_project(&class_path, &class_content, existing_files)?;
 
             // Generate tests (skip if exists)
             let test_content = generator.generate_impure_test(noun);
             let test_path = noun_dir.join(format!("{}{}.{}", noun.name, test_suffix, ext));
-            write_if_not_exists(&test_path, &test_content)?;
+            write_if_not_exists_in_project(&test_path, &test_content, existing_files)?;
         }
     }
 
@@ -130,12 +164,12 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
         // Generate integration code (skip if exists)
         let code_content = generator.generate_integration(req);
         let code_path = integration_dir.join(format!("{}-{}.{}", req.noun, req.verb, ext));
-        write_if_not_exists(&code_path, &code_content)?;
+        write_if_not_exists_in_project(&code_path, &code_content, existing_files)?;
 
         // Generate integration tests (skip if exists)
         let test_content = generator.generate_integration_test(req);
         let test_path = integration_dir.join(format!("{}-{}{}.{}", req.noun, req.verb, test_suffix, ext));
-        write_if_not_exists(&test_path, &test_content)?;
+        write_if_not_exists_in_project(&test_path, &test_content, existing_files)?;
     }
 
     // Generate polymorphic classes (in pure/ or impure/ based on boundaries, skip if exists)
@@ -172,12 +206,12 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
         // Generate base class in shared/ (skip if exists)
         let base_content = generator.generate_poly_base_class(poly);
         let base_path = shared_dir.join(format!("mod.{}", ext));
-        write_if_not_exists(&base_path, &base_content)?;
+        write_if_not_exists_in_project(&base_path, &base_content, existing_files)?;
 
         // Generate base tests in shared/ (skip if exists)
         let base_test_content = generator.generate_poly_base_test(poly);
         let base_test_path = shared_dir.join(format!("mod{}.{}", test_suffix, ext));
-        write_if_not_exists(&base_test_path, &base_test_content)?;
+        write_if_not_exists_in_project(&base_test_path, &base_test_content, existing_files)?;
 
         // Generate implementations module (always overwrite - just re-exports)
         let impl_mod_content = generator.generate_poly_implementations_mod(poly);
@@ -194,12 +228,12 @@ fn generate_all(dist_dir: &Path, spec: &AnalyzedSpec, generator: &dyn Generator)
             // Generate case class (skip if exists)
             let case_content = generator.generate_poly_case_class(poly, case);
             let case_path = case_dir.join(format!("mod.{}", ext));
-            write_if_not_exists(&case_path, &case_content)?;
+            write_if_not_exists_in_project(&case_path, &case_content, existing_files)?;
 
             // Generate case tests (skip if exists)
             let case_test_content = generator.generate_poly_case_test(poly, case);
             let case_test_path = case_dir.join(format!("mod{}.{}", test_suffix, ext));
-            write_if_not_exists(&case_test_path, &case_test_content)?;
+            write_if_not_exists_in_project(&case_test_path, &case_test_content, existing_files)?;
         }
     }
 
@@ -312,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn generate_skips_existing_files() {
+    fn generate_skips_files_that_exist_anywhere_in_project() {
         let temp = tempdir().unwrap();
         let input_path = temp.path().join("example.rune");
 
@@ -332,23 +366,24 @@ mod tests {
     output
 "#).unwrap();
 
-        // First run: generates all files
+        // Create a file with the same name OUTSIDE dist.rune (simulating user moved it)
+        let src_dir = temp.path().join("src/domain");
+        fs::create_dir_all(&src_dir).unwrap();
+        let existing_file = src_dir.join("id.ts");
+        let custom_content = "// User's implementation in src/domain/id.ts";
+        fs::write(&existing_file, custom_content).unwrap();
+
+        // Run generate - should skip id.ts since it exists in the project
         let result = generate(&input_path, "ts-deno-native-class-validator-esm", None);
         assert!(result.is_ok());
 
+        // Verify the file was NOT generated in dist.rune
         let dist_dir = temp.path().join("dist.rune");
-        let class_path = dist_dir.join("pure/id/id.ts");
+        let would_be_path = dist_dir.join("pure/id/id.ts");
+        assert!(!would_be_path.exists(), "File should not have been generated because id.ts exists in src/domain/");
 
-        // Modify the generated file with custom content
-        let custom_content = "// Custom implementation - should not be overwritten";
-        fs::write(&class_path, custom_content).unwrap();
-
-        // Second run: should skip existing files
-        let result = generate(&input_path, "ts-deno-native-class-validator-esm", None);
-        assert!(result.is_ok());
-
-        // Verify the file was NOT overwritten
-        let content = fs::read_to_string(&class_path).unwrap();
-        assert_eq!(content, custom_content, "File should not have been overwritten");
+        // Verify the original file is still there and unchanged
+        let content = fs::read_to_string(&existing_file).unwrap();
+        assert_eq!(content, custom_content);
     }
 }
