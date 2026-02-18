@@ -11,7 +11,7 @@ DATA_DIR="${RUNE_DATA:-$HOME/.local/share/rune}"
 export RUNE_DATA="$DATA_DIR"
 
 echo "Installing Rune..."
-echo "  Binary: $BIN_DIR/rune"
+echo "  Binary: $BIN_DIR/rune-lsp"
 echo "  Data:   $DATA_DIR/"
 echo
 
@@ -29,10 +29,10 @@ check_dep cc "Install a C compiler (clang or gcc)"
 
 # Build LSP
 echo "Building LSP..."
-cd "$RUNE_ROOT/lsp"
-cargo build --release --quiet
+cd "$RUNE_ROOT"
+cargo build -p rune-lsp --release --quiet
 mkdir -p "$BIN_DIR"
-cp target/release/rune "$BIN_DIR/"
+cp target/release/rune-lsp "$BIN_DIR/"
 echo "  ✓ LSP installed"
 
 # Build tree-sitter parser

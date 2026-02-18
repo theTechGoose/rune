@@ -52,7 +52,7 @@ cat > "$ZED_EXT/lsp-settings.json" << 'EOF'
   "lsp": {
     "rune": {
       "binary": {
-        "path": "~/.local/bin/rune"
+        "path": "~/.local/bin/rune-lsp"
       }
     }
   },
@@ -73,7 +73,7 @@ echo "  1. Add to ~/.config/zed/settings.json:"
 cat << 'EOF'
      {
        "lsp": {
-         "rune": { "binary": { "path": "~/.local/bin/rune" } }
+         "rune": { "binary": { "path": "~/.local/bin/rune-lsp" } }
        },
        "languages": {
          "Rune": { "language_servers": ["rune"] }

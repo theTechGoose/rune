@@ -237,7 +237,7 @@ vim.api.nvim_set_hl(0, "@rune.comment", { fg = "#7a7070" })  -- warm gray
 -- Start Rune LSP
 vim.lsp.start({
   name = "rune",
-  cmd = { vim.fn.expand("~/.local/bin/rune") },
+  cmd = { vim.fn.expand("~/.local/bin/rune-lsp") },
   root_dir = vim.fn.getcwd(),
 })
 "##).map_err(|e| format!("Failed to write ftplugin: {}", e))?;
@@ -276,7 +276,7 @@ indent = { tab-width = 2, unit = "  " }
 language-servers = ["rune-lsp"]
 
 [language-server.rune-lsp]
-command = "rune"
+command = "rune-lsp"
 "##;
 
     if languages_path.exists() {

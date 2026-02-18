@@ -38,7 +38,7 @@ language-servers = ["rune"]
 grammar = "rune"
 
 [language-server.rune]
-command = "rune"
+command = "rune-lsp"
 
 [[grammar]]
 name = "rune"

@@ -66,9 +66,9 @@ class RuneSemanticTokensProvider implements vscode.DocumentSemanticTokensProvide
 function findRuneBinary(): string | undefined {
   // Check common locations
   const locations = [
-    path.join(os.homedir(), '.local', 'bin', 'rune'),
-    '/usr/local/bin/rune',
-    '/usr/bin/rune',
+    path.join(os.homedir(), '.local', 'bin', 'rune-lsp'),
+    '/usr/local/bin/rune-lsp',
+    '/usr/bin/rune-lsp',
   ];
 
   for (const loc of locations) {

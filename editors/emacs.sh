@@ -165,14 +165,14 @@ cat > "$RUNE_EL" << 'EOF'
   (add-to-list 'lsp-language-id-configuration '(rune-ts-mode . "rune"))
   (lsp-register-client
    (make-lsp-client
-    :new-connection (lsp-stdio-connection "rune")
+    :new-connection (lsp-stdio-connection "rune-lsp")
     :activation-fn (lsp-activate-on "rune")
     :server-id 'rune-lsp)))
 
 ;; Eglot support
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               '(rune-ts-mode . ("rune"))))
+               '(rune-ts-mode . ("rune-lsp"))))
 
 (provide 'rune-ts-mode)
 ;;; rune-ts-mode.el ends here
