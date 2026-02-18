@@ -14,7 +14,7 @@ LLMs hallucinate error handling. They forget edge cases. They invent APIs.
 
 Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and contracts once. The LLM implements exactly that — no more, no less.
 
-[Full syntax &rarr;](docs/rules-cheatsheet.md)
+[Full syntax &rarr;](docs/spec.md) · [Constraints &rarr;](docs/constraints.md)
 
 ## Install
 
