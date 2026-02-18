@@ -14,14 +14,14 @@ mkdir -p "$EMACS_DIR/lisp"
 
 # Create major mode
 cat > "$RUNE_EL" << 'EOF'
-;;; rune-mode.el --- Major mode for reqspec requirement files -*- lexical-binding: t; -*-
+;;; rune-mode.el --- Major mode for rune requirement files -*- lexical-binding: t; -*-
 
 ;; Author: Rune Contributors
 ;; Version: 0.1.0
 ;; Keywords: languages, requirements
 
 ;;; Commentary:
-;; Provides syntax highlighting and LSP support for reqspec files.
+;; Provides syntax highlighting and LSP support for rune files.
 
 ;;; Code:
 
@@ -90,8 +90,8 @@ cat > "$RUNE_EL" << 'EOF'
   "Font lock keywords for rune-mode.")
 
 ;;;###autoload
-(define-derived-mode rune-mode prog-mode "Reqspec"
-  "Major mode for editing reqspec requirement files."
+(define-derived-mode rune-mode prog-mode "Rune"
+  "Major mode for editing rune requirement files."
   (setq-local comment-start "// ")
   (setq-local comment-end "")
   (setq-local font-lock-defaults '(rune-mode-font-lock-keywords)))
@@ -102,11 +102,11 @@ cat > "$RUNE_EL" << 'EOF'
 
 ;; LSP support (requires lsp-mode)
 (with-eval-after-load 'lsp-mode
-  (add-to-list 'lsp-language-id-configuration '(rune-mode . "reqspec"))
+  (add-to-list 'lsp-language-id-configuration '(rune-mode . "rune"))
   (lsp-register-client
    (make-lsp-client
     :new-connection (lsp-stdio-connection '("~/.local/bin/rune"))
-    :activation-fn (lsp-activate-on "reqspec")
+    :activation-fn (lsp-activate-on "rune")
     :server-id 'rune-lsp)))
 
 ;; Eglot support

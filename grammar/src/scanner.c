@@ -6,18 +6,18 @@ enum TokenType {
   DTO_DESC,
 };
 
-void *tree_sitter_reqspec_external_scanner_create() {
+void *tree_sitter_rune_external_scanner_create() {
   return NULL;
 }
 
-void tree_sitter_reqspec_external_scanner_destroy(void *payload) {
+void tree_sitter_rune_external_scanner_destroy(void *payload) {
 }
 
-unsigned tree_sitter_reqspec_external_scanner_serialize(void *payload, char *buffer) {
+unsigned tree_sitter_rune_external_scanner_serialize(void *payload, char *buffer) {
   return 0;
 }
 
-void tree_sitter_reqspec_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
+void tree_sitter_rune_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
 }
 
 static bool is_at_line_start(TSLexer *lexer) {
@@ -55,7 +55,7 @@ static bool looks_like_code(const char *buf, int len) {
   return has_paren_after_dot;
 }
 
-bool tree_sitter_reqspec_external_scanner_scan(
+bool tree_sitter_rune_external_scanner_scan(
   void *payload,
   TSLexer *lexer,
   const bool *valid_symbols

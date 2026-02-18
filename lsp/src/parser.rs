@@ -1,4 +1,4 @@
-//! Fast line-based parser for reqspec files
+//! Fast line-based parser for rune files
 
 #[derive(Debug, Clone)]
 pub struct ParsedLine {

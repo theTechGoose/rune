@@ -2,7 +2,7 @@
 // @ts-check
 
 module.exports = grammar({
-  name: "reqspec",
+  name: "rune",
 
   extras: ($) => [/ /, /\t/, $.comment],
 

@@ -1,9 +1,9 @@
 {
-  "name": "tree-sitter-reqspec",
+  "name": "tree-sitter-rune",
   "version": "1.0.0",
-  "description": "Tree-sitter grammar for requirements specification files",
+  "description": "Tree-sitter grammar for Rune requirement files",
   "main": "bindings/node",
-  "keywords": ["tree-sitter", "parser", "reqspec"],
+  "keywords": ["tree-sitter", "parser", "rune"],
   "files": ["grammar.js", "binding.gyp", "prebuilds/**", "bindings/node/*", "queries/*", "src/**"],
   "dependencies": {
     "node-addon-api": "^8.3.0",
@@ -19,7 +19,7 @@
   },
   "tree-sitter": [
     {
-      "scope": "source.reqspec",
+      "scope": "source.rune",
       "file-types": ["requirements"],
       "highlights": "queries/highlights.scm"
     }

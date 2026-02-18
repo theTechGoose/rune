@@ -50,10 +50,10 @@ case "$(uname -s)" in
   *)      EXT="so"; SHARED="-shared" ;;
 esac
 
-cc $SHARED -o reqspec.$EXT -fPIC -O2 src/parser.c src/scanner.c -I src 2>/dev/null
+cc $SHARED -o rune.$EXT -fPIC -O2 src/parser.c src/scanner.c -I src 2>/dev/null
 
 mkdir -p "$DATA_DIR/parser"
-cp reqspec.$EXT "$DATA_DIR/parser/"
+cp rune.$EXT "$DATA_DIR/parser/"
 echo "  ✓ Parser installed"
 
 # Copy queries

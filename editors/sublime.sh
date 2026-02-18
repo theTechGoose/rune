@@ -14,7 +14,7 @@ else
   SUBLIME_PACKAGES="$HOME/.config/sublime-text-3/Packages"
 fi
 
-RUNE_PKG="$SUBLIME_PACKAGES/Reqspec"
+RUNE_PKG="$SUBLIME_PACKAGES/Rune"
 
 echo "Setting up Rune for Sublime Text..."
 echo "  Packages: $SUBLIME_PACKAGES"
@@ -23,73 +23,73 @@ echo "  Packages: $SUBLIME_PACKAGES"
 mkdir -p "$RUNE_PKG"
 
 # Create syntax definition
-cat > "$RUNE_PKG/Reqspec.sublime-syntax" << 'EOF'
+cat > "$RUNE_PKG/Rune.sublime-syntax" << 'EOF'
 %YAML 1.2
 ---
-name: Reqspec
+name: Rune
 file_extensions: []
 first_line_match: '^\[REQ\]'
-scope: source.reqspec
+scope: source.rune
 
 contexts:
   main:
     # Tags
     - match: '\[(REQ|DTO|TYP|PLY|CSE|CTR|RET)\]'
-      scope: keyword.control.tag.reqspec
+      scope: keyword.control.tag.rune
 
     # DTO references
     - match: '\b[A-Z][a-zA-Z]*Dto\b'
-      scope: entity.name.type.dto.reqspec
+      scope: entity.name.type.dto.rune
 
     # Boundary prefixes
     - match: '\b(db|fs|mq|ex|os|lg):'
-      scope: keyword.operator.boundary.reqspec
+      scope: keyword.operator.boundary.rune
 
     # Builtins
     - match: '\b(Class|string|number|boolean|void|Uint8Array|Primitive)\b'
-      scope: storage.type.builtin.reqspec
+      scope: storage.type.builtin.rune
 
     # Faults (indented lowercase hyphenated words)
     - match: '^\s{6,}[a-z][a-z0-9-]*(?:\s+[a-z][a-z0-9-]*)*\s*$'
-      scope: variable.other.fault.reqspec
+      scope: variable.other.fault.rune
 
     # Comments
     - match: '//.*$'
-      scope: comment.line.reqspec
+      scope: comment.line.rune
 
     # Method signatures (noun.verb or Noun::verb)
     - match: '([a-zA-Z_][a-zA-Z0-9_]*)(\.|\:\:)([a-zA-Z_][a-zA-Z0-9_]*)'
       captures:
-        1: variable.other.noun.reqspec
-        2: punctuation.accessor.reqspec
-        3: entity.name.function.verb.reqspec
+        1: variable.other.noun.rune
+        2: punctuation.accessor.rune
+        3: entity.name.function.verb.rune
 EOF
 echo "  ✓ Syntax definition created"
 
 # Create color scheme additions
-cat > "$RUNE_PKG/Reqspec.sublime-color-scheme" << 'EOF'
+cat > "$RUNE_PKG/Rune.sublime-color-scheme" << 'EOF'
 {
-  "name": "Reqspec Mesa Vapor",
+  "name": "Rune Mesa Vapor",
   "globals": {},
   "rules": [
-    { "scope": "keyword.control.tag.reqspec", "foreground": "#89babf" },
-    { "scope": "entity.name.type.dto.reqspec", "foreground": "#8fb86e" },
-    { "scope": "keyword.operator.boundary.reqspec", "foreground": "#b38585" },
-    { "scope": "storage.type.builtin.reqspec", "foreground": "#eeeeee" },
-    { "scope": "variable.other.fault.reqspec", "foreground": "#c9826a" },
-    { "scope": "comment.line.reqspec", "foreground": "#7a7070" },
-    { "scope": "variable.other.noun.reqspec", "foreground": "#8a9e7a" },
-    { "scope": "entity.name.function.verb.reqspec", "foreground": "#9e8080" }
+    { "scope": "keyword.control.tag.rune", "foreground": "#89babf" },
+    { "scope": "entity.name.type.dto.rune", "foreground": "#8fb86e" },
+    { "scope": "keyword.operator.boundary.rune", "foreground": "#b38585" },
+    { "scope": "storage.type.builtin.rune", "foreground": "#eeeeee" },
+    { "scope": "variable.other.fault.rune", "foreground": "#c9826a" },
+    { "scope": "comment.line.rune", "foreground": "#7a7070" },
+    { "scope": "variable.other.noun.rune", "foreground": "#8a9e7a" },
+    { "scope": "entity.name.function.verb.rune", "foreground": "#9e8080" }
   ]
 }
 EOF
 echo "  ✓ Color scheme created"
 
 # Create file type association
-cat > "$RUNE_PKG/Reqspec.sublime-settings" << 'EOF'
+cat > "$RUNE_PKG/Rune.sublime-settings" << 'EOF'
 {
   "extensions": [],
-  "color_scheme": "Packages/Reqspec/Reqspec.sublime-color-scheme"
+  "color_scheme": "Packages/Rune/Rune.sublime-color-scheme"
 }
 EOF
 
@@ -98,7 +98,7 @@ cat > "$RUNE_PKG/ApplySyntax.sublime-settings" << 'EOF'
 {
   "syntaxes": [
     {
-      "syntax": "Reqspec/Reqspec",
+      "syntax": "Rune/Rune",
       "match": "all",
       "rules": [
         { "file_path": ".*/requirements$" },
@@ -117,7 +117,7 @@ cat > "$RUNE_PKG/LSP-rune.sublime-settings" << 'EOF'
     "rune": {
       "enabled": true,
       "command": ["~/.local/bin/rune"],
-      "selector": "source.reqspec"
+      "selector": "source.rune"
     }
   }
 }

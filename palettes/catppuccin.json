@@ -1,6 +1,6 @@
 {
   "name": "Catppuccin Mocha",
-  "description": "Catppuccin Mocha palette for reqspec",
+  "description": "Catppuccin Mocha palette for Rune",
   "colors": {
     "tag": "#f9e2af",
     "noun": "#a6e3a1",

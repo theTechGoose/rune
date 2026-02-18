@@ -2,7 +2,7 @@
 name = "rune"
 version = "0.1.0"
 edition = "2024"
-description = "Lightning-fast LSP for reqspec files"
+description = "Lightning-fast LSP for rune files"
 
 [dependencies]
 tower-lsp = "0.20"

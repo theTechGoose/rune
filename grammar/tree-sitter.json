@@ -1,8 +1,8 @@
 {
   "grammars": [
     {
-      "name": "reqspec",
-      "scope": "source.reqspec",
+      "name": "rune",
+      "scope": "source.rune",
       "file-types": ["requirements"],
       "highlights": "queries/highlights.scm",
       "path": "."
@@ -10,6 +10,6 @@
   ],
   "metadata": {
     "version": "1.0.0",
-    "description": "Tree-sitter grammar for requirements specification files"
+    "description": "Tree-sitter grammar for Rune requirement files"
   }
 }

@@ -10,19 +10,19 @@ echo "Setting up Rune for Zed..."
 
 # Create extension directory structure
 mkdir -p "$ZED_EXT/grammars"
-mkdir -p "$ZED_EXT/languages/reqspec"
+mkdir -p "$ZED_EXT/languages/rune"
 
 # Create extension.toml
 cat > "$ZED_EXT/extension.toml" << 'EOF'
 id = "rune"
-name = "Rune Reqspec"
-description = "Syntax highlighting and LSP for reqspec requirement files"
+name = "Rune Rune"
+description = "Syntax highlighting and LSP for rune requirement files"
 version = "0.1.0"
 schema_version = 1
 authors = ["Rune Contributors"]
 repository = "https://github.com/youruser/rune"
 
-[grammars.reqspec]
+[grammars.rune]
 repository = "https://github.com/youruser/rune"
 path = "grammar"
 EOF
@@ -33,9 +33,9 @@ cp -r "$DATA_DIR/grammar/"* "$ZED_EXT/grammars/"
 echo "  ✓ Grammar installed"
 
 # Create language config
-cat > "$ZED_EXT/languages/reqspec/config.toml" << 'EOF'
-name = "Reqspec"
-grammar = "reqspec"
+cat > "$ZED_EXT/languages/rune/config.toml" << 'EOF'
+name = "Rune"
+grammar = "rune"
 path_suffixes = []
 line_comments = ["//"]
 block_comment = ["/*", "*/"]
@@ -43,7 +43,7 @@ EOF
 echo "  ✓ Language config created"
 
 # Copy highlights
-cp "$DATA_DIR/queries/highlights.scm" "$ZED_EXT/languages/reqspec/"
+cp "$DATA_DIR/queries/highlights.scm" "$ZED_EXT/languages/rune/"
 echo "  ✓ Highlights installed"
 
 # Create LSP settings suggestion
@@ -57,7 +57,7 @@ cat > "$ZED_EXT/lsp-settings.json" << 'EOF'
     }
   },
   "languages": {
-    "Reqspec": {
+    "Rune": {
       "language_servers": ["rune"]
     }
   }
@@ -76,10 +76,10 @@ cat << 'EOF'
          "rune": { "binary": { "path": "~/.local/bin/rune" } }
        },
        "languages": {
-         "Reqspec": { "language_servers": ["rune"] }
+         "Rune": { "language_servers": ["rune"] }
        },
        "file_types": {
-         "Reqspec": ["requirements"]
+         "Rune": ["requirements"]
        }
      }
 EOF
