@@ -14,7 +14,6 @@ fn scan_existing_files(dir: &Path) -> HashSet<String> {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
-                // Recurse into subdirectories
                 files.extend(scan_existing_files(&path));
             } else if let Some(name) = path.file_name() {
                 files.insert(name.to_string_lossy().to_string());
@@ -22,6 +21,20 @@ fn scan_existing_files(dir: &Path) -> HashSet<String> {
         }
     }
     files
+}
+
+/// Recursively remove empty directories
+fn cleanup_empty_dirs(dir: &Path) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                cleanup_empty_dirs(&path);
+                // Try to remove - will fail if not empty, which is fine
+                let _ = fs::remove_dir(&path);
+            }
+        }
+    }
 }
 
 /// Write content to a file only if a file with that name doesn't exist anywhere in the project
@@ -233,6 +246,9 @@ fn generate_all(
             write_if_not_exists_in_project(&case_test_path, &case_test_content, existing_files)?;
         }
     }
+
+    // Clean up empty directories
+    cleanup_empty_dirs(dist_dir);
 
     Ok(())
 }

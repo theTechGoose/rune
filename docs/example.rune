@@ -30,7 +30,7 @@
     id.toDto(): IdDto
     os:storage.load(IdDto): DataDto
       not-found timed-out network-error
-  [CTR] metadata
+    [CTR] metadata
     db:metadata.get(IdDto): MetadataDto
       not-found timed-out network-error
     recording::create(DataDto, MetadataDto): recording
