@@ -4,9 +4,10 @@
 
 use std::env;
 use std::fs;
-use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
+
+use inquire::{MultiSelect, Select};
 
 // Embed grammar source files at compile time
 const PARSER_C: &str = include_str!("../../../grammar/src/parser.c");
@@ -423,101 +424,55 @@ fn setup_shell_completions(shell: &str) -> Result<(), String> {
 }
 
 fn prompt_editor() -> Result<Editor, String> {
-    println!("Which editor would you like to configure?");
-    println!();
-    println!("  [1] Neovim");
-    println!("  [2] Helix");
-    println!("  [3] VS Code");
-    println!("  [4] Zed");
-    println!("  [5] Sublime Text");
-    println!("  [6] Emacs");
-    println!();
+    let options = vec!["Neovim", "Helix", "VS Code", "Zed", "Sublime Text", "Emacs"];
 
-    print!("Select [1-6]: ");
-    io::stdout().flush().map_err(|e| e.to_string())?;
+    let selection = Select::new("Which editor would you like to configure?", options)
+        .prompt()
+        .map_err(|e| e.to_string())?;
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
-
-    Editor::from_str(input.trim()).ok_or_else(|| "Invalid selection".to_string())
+    Editor::from_str(selection).ok_or_else(|| "Invalid selection".to_string())
 }
 
 fn prompt_editors() -> Result<Vec<Editor>, String> {
-    println!("Which editors would you like to configure?");
-    println!("(Enter numbers separated by spaces, or press Enter to skip)");
-    println!();
-    println!("  [1] Neovim");
-    println!("  [2] Helix");
-    println!("  [3] VS Code");
-    println!("  [4] Zed");
-    println!("  [5] Sublime Text");
-    println!("  [6] Emacs");
-    println!();
+    let options = vec!["Neovim", "Helix", "VS Code", "Zed", "Sublime Text", "Emacs"];
 
-    print!("Select: ");
-    io::stdout().flush().map_err(|e| e.to_string())?;
+    let selections = MultiSelect::new("Configure editors (space to select, enter to confirm):", options)
+        .prompt()
+        .map_err(|e| e.to_string())?;
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
-
-    let editors: Vec<Editor> = input
-        .trim()
-        .split_whitespace()
-        .filter_map(|s| Editor::from_str(s))
-        .collect();
-
-    Ok(editors)
+    Ok(selections.into_iter().filter_map(|s| Editor::from_str(s)).collect())
 }
 
 fn prompt_shell() -> Result<Option<String>, String> {
-    println!("Configure shell completions?");
-    println!("(Enter number or press Enter to skip)");
-    println!();
-    println!("  [1] zsh");
-    println!("  [2] bash");
-    println!("  [3] fish");
-    println!();
+    let options = vec!["zsh", "bash", "fish", "Skip"];
 
-    print!("Select: ");
-    io::stdout().flush().map_err(|e| e.to_string())?;
+    let selection = Select::new("Configure shell completions?", options)
+        .prompt()
+        .map_err(|e| e.to_string())?;
 
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
-
-    let shell = match input.trim() {
-        "1" | "zsh" => Some("zsh".to_string()),
-        "2" | "bash" => Some("bash".to_string()),
-        "3" | "fish" => Some("fish".to_string()),
-        "" => None,
-        _ => None,
-    };
-
-    Ok(shell)
+    match selection {
+        "Skip" => Ok(None),
+        shell => Ok(Some(shell.to_string())),
+    }
 }
 
 fn prompt_icons() -> Result<IconTargets, String> {
-    println!("Configure file icons for tools?");
-    println!("(Enter numbers separated by spaces, or press Enter to skip)");
-    println!();
-    println!("  [1] yazi (file manager)");
-    println!("  [2] lf (file manager)");
-    println!("  [3] eza (ls replacement)");
-    println!("  [4] lsd (ls replacement)");
-    println!();
+    let options = vec![
+        "yazi (file manager)",
+        "lf (file manager)",
+        "eza (ls replacement)",
+        "lsd (ls replacement)",
+    ];
 
-    print!("Select: ");
-    io::stdout().flush().map_err(|e| e.to_string())?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).map_err(|e| e.to_string())?;
-
-    let selections: Vec<&str> = input.trim().split_whitespace().collect();
+    let selections = MultiSelect::new("Configure file icons (space to select, enter to confirm):", options)
+        .prompt()
+        .map_err(|e| e.to_string())?;
 
     Ok(IconTargets {
-        yazi: selections.iter().any(|s| *s == "1" || s.to_lowercase() == "yazi"),
-        lf: selections.iter().any(|s| *s == "2" || s.to_lowercase() == "lf"),
-        eza: selections.iter().any(|s| *s == "3" || s.to_lowercase() == "eza"),
-        lsd: selections.iter().any(|s| *s == "4" || s.to_lowercase() == "lsd"),
+        yazi: selections.iter().any(|s| s.starts_with("yazi")),
+        lf: selections.iter().any(|s| s.starts_with("lf")),
+        eza: selections.iter().any(|s| s.starts_with("eza")),
+        lsd: selections.iter().any(|s| s.starts_with("lsd")),
     })
 }
 
