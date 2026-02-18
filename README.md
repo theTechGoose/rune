@@ -5,21 +5,21 @@
 <h1 align="center">Rune</h1>
 
 <p align="center">
-  Language server and syntax highlighting for requirement specification files.
+  Specify your requirements. Catch missing error handling before you write code.
 </p>
 
-## Syntax
+## Why Rune
+
+Every `db:` call can fail. Every `ex:` call can timeout. Rune makes you declare these upfront:
 
 ```
-[REQ] user.create(CreateUserDto): UserDto
-    user::validate(email): user
-      invalid-email
-    db:user.save(user): void
-      network-error
-    user.toDto(): UserDto
+db:user.save(user): void
+  network-error duplicate-key
 ```
 
-[Learn the full syntax &rarr;](docs/rules-cheatsheet.md)
+The LSP warns when a boundary has no faults. Your spec becomes the contract.
+
+[Full syntax &rarr;](docs/rules-cheatsheet.md)
 
 ## Quickstart
 
