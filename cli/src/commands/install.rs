@@ -1,10 +1,20 @@
 //! Install command - sets up Rune LSP, parser, and editor integration
+//!
+//! Grammar files are embedded at compile time so the binary is self-contained.
 
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::Command;
+
+// Embed grammar source files at compile time
+const PARSER_C: &str = include_str!("../../../grammar/src/parser.c");
+const SCANNER_C: &str = include_str!("../../../grammar/src/scanner.c");
+const PARSER_H: &str = include_str!("../../../grammar/src/tree_sitter/parser.h");
+const ALLOC_H: &str = include_str!("../../../grammar/src/tree_sitter/alloc.h");
+const ARRAY_H: &str = include_str!("../../../grammar/src/tree_sitter/array.h");
+const HIGHLIGHTS_SCM: &str = include_str!("../../../queries/highlights.scm");
 
 #[derive(Debug, Clone, Copy)]
 pub enum Editor {
@@ -41,22 +51,9 @@ fn data_dir() -> PathBuf {
         })
 }
 
-/// Get the rune source directory (where the repo is)
-fn source_dir() -> Option<PathBuf> {
-    // Try to find it relative to the executable
-    env::current_exe().ok().and_then(|exe| {
-        // exe is in target/release or target/debug, go up to find repo root
-        exe.parent()  // release/debug
-            .and_then(|p| p.parent())  // target
-            .and_then(|p| p.parent())  // repo root
-            .map(|p| p.to_path_buf())
-    })
-}
-
 /// Install Rune components
 pub fn install(editor: Option<Editor>) -> Result<(), String> {
     let data = data_dir();
-    let source = source_dir().ok_or("Could not determine source directory")?;
 
     println!("Installing Rune...");
     println!("  Data: {}", data.display());
@@ -66,42 +63,14 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
     fs::create_dir_all(&data).map_err(|e| format!("Failed to create data dir: {}", e))?;
     fs::create_dir_all(data.join("parser")).map_err(|e| format!("Failed to create parser dir: {}", e))?;
     fs::create_dir_all(data.join("queries")).map_err(|e| format!("Failed to create queries dir: {}", e))?;
-    fs::create_dir_all(data.join("palettes")).map_err(|e| format!("Failed to create palettes dir: {}", e))?;
-    fs::create_dir_all(data.join("grammar")).map_err(|e| format!("Failed to create grammar dir: {}", e))?;
 
-    // Copy queries
-    let queries_src = source.join("queries/highlights.scm");
-    if queries_src.exists() {
-        fs::copy(&queries_src, data.join("queries/highlights.scm"))
-            .map_err(|e| format!("Failed to copy queries: {}", e))?;
-        println!("  ✓ Queries installed");
-    }
+    // Write embedded queries
+    fs::write(data.join("queries/highlights.scm"), HIGHLIGHTS_SCM)
+        .map_err(|e| format!("Failed to write queries: {}", e))?;
+    println!("  ✓ Queries installed");
 
-    // Copy palettes
-    let palettes_src = source.join("palettes");
-    if palettes_src.exists() {
-        for entry in fs::read_dir(&palettes_src).map_err(|e| format!("Failed to read palettes: {}", e))? {
-            let entry = entry.map_err(|e| format!("Failed to read palette entry: {}", e))?;
-            let dest = data.join("palettes").join(entry.file_name());
-            fs::copy(entry.path(), dest).map_err(|e| format!("Failed to copy palette: {}", e))?;
-        }
-        println!("  ✓ Palettes installed");
-    }
-
-    // Copy grammar source
-    let grammar_src = source.join("grammar/grammar.js");
-    if grammar_src.exists() {
-        fs::copy(&grammar_src, data.join("grammar/grammar.js"))
-            .map_err(|e| format!("Failed to copy grammar.js: {}", e))?;
-    }
-    let parser_src_dir = source.join("grammar/src");
-    if parser_src_dir.exists() {
-        copy_dir_recursive(&parser_src_dir, &data.join("grammar/src"))?;
-        println!("  ✓ Grammar source installed");
-    }
-
-    // Build tree-sitter parser
-    build_parser(&source, &data)?;
+    // Build tree-sitter parser from embedded sources
+    build_parser(&data)?;
 
     println!();
 
@@ -119,17 +88,27 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
     Ok(())
 }
 
-/// Build the tree-sitter parser from source
-fn build_parser(source: &PathBuf, data: &PathBuf) -> Result<(), String> {
-    let grammar_dir = source.join("grammar/src");
-    let parser_c = grammar_dir.join("parser.c");
-    let scanner_c = grammar_dir.join("scanner.c");
-
-    if !parser_c.exists() {
-        return Err("Grammar source not found. Cannot build parser.".to_string());
-    }
-
+/// Build the tree-sitter parser from embedded sources
+fn build_parser(data: &PathBuf) -> Result<(), String> {
     println!("Building parser...");
+
+    // Create temp directory for compilation
+    let temp_dir = env::temp_dir().join("rune-build");
+    let tree_sitter_dir = temp_dir.join("tree_sitter");
+    fs::create_dir_all(&tree_sitter_dir)
+        .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+    // Write embedded source files
+    let parser_c = temp_dir.join("parser.c");
+    let scanner_c = temp_dir.join("scanner.c");
+    fs::write(&parser_c, PARSER_C).map_err(|e| format!("Failed to write parser.c: {}", e))?;
+    fs::write(&scanner_c, SCANNER_C).map_err(|e| format!("Failed to write scanner.c: {}", e))?;
+    fs::write(tree_sitter_dir.join("parser.h"), PARSER_H)
+        .map_err(|e| format!("Failed to write parser.h: {}", e))?;
+    fs::write(tree_sitter_dir.join("alloc.h"), ALLOC_H)
+        .map_err(|e| format!("Failed to write alloc.h: {}", e))?;
+    fs::write(tree_sitter_dir.join("array.h"), ARRAY_H)
+        .map_err(|e| format!("Failed to write array.h: {}", e))?;
 
     // Determine shared library flags based on OS
     let (shared_flag, output_name) = if cfg!(target_os = "macos") {
@@ -141,22 +120,21 @@ fn build_parser(source: &PathBuf, data: &PathBuf) -> Result<(), String> {
     let output_path = data.join("parser").join(output_name);
 
     // Build with cc
-    let mut cmd = Command::new("cc");
-    cmd.arg(shared_flag)
+    let output = Command::new("cc")
+        .arg(shared_flag)
         .arg("-o")
         .arg(&output_path)
         .arg("-fPIC")
         .arg("-O2")
         .arg(&parser_c)
+        .arg(&scanner_c)
         .arg("-I")
-        .arg(&grammar_dir);
+        .arg(&temp_dir)
+        .output()
+        .map_err(|e| format!("Failed to run cc: {}", e))?;
 
-    // Add scanner.c if it exists
-    if scanner_c.exists() {
-        cmd.arg(&scanner_c);
-    }
-
-    let output = cmd.output().map_err(|e| format!("Failed to run cc: {}", e))?;
+    // Clean up temp files
+    let _ = fs::remove_dir_all(&temp_dir);
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -164,21 +142,6 @@ fn build_parser(source: &PathBuf, data: &PathBuf) -> Result<(), String> {
     }
 
     println!("  ✓ Parser built");
-    Ok(())
-}
-
-fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
-    fs::create_dir_all(dest).map_err(|e| format!("Failed to create dir: {}", e))?;
-    for entry in fs::read_dir(src).map_err(|e| format!("Failed to read dir: {}", e))? {
-        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
-        let src_path = entry.path();
-        let dest_path = dest.join(entry.file_name());
-        if src_path.is_dir() {
-            copy_dir_recursive(&src_path, &dest_path)?;
-        } else {
-            fs::copy(&src_path, &dest_path).map_err(|e| format!("Failed to copy file: {}", e))?;
-        }
-    }
     Ok(())
 }
 
