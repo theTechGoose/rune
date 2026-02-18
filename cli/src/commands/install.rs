@@ -83,7 +83,7 @@ fn find_source_dir() -> Option<PathBuf> {
 }
 
 /// Install Rune components
-pub fn install(editor: Option<Editor>) -> Result<(), String> {
+pub fn install(editor: Option<Editor>, shell: Option<&str>) -> Result<(), String> {
     let data = data_dir();
     let bin = bin_dir();
 
@@ -109,15 +109,17 @@ pub fn install(editor: Option<Editor>) -> Result<(), String> {
     // Build and install LSP
     build_lsp(&bin)?;
 
+    // Shell completions
+    if let Some(shell) = shell {
+        setup_shell_completions(shell)?;
+    }
+
     println!();
 
     // Editor setup
-    let editor = match editor {
-        Some(e) => e,
-        None => prompt_editor()?,
-    };
-
-    setup_editor(editor, &data)?;
+    if let Some(e) = editor {
+        setup_editor(e, &data)?;
+    }
 
     println!();
     println!("Done!");
@@ -343,6 +345,58 @@ fn build_lsp(bin_dir: &PathBuf) -> Result<(), String> {
         .map_err(|e| format!("Failed to install LSP binary: {}", e))?;
 
     println!("  ✓ LSP installed");
+    Ok(())
+}
+
+/// Set up shell completions by adding to shell config file
+fn setup_shell_completions(shell: &str) -> Result<(), String> {
+    let home = dirs::home_dir().ok_or("Could not find home directory")?;
+
+    let (config_file, completion_line) = match shell {
+        "zsh" => (
+            home.join(".zshrc"),
+            r#"eval "$(rune completions zsh)""#,
+        ),
+        "bash" => (
+            home.join(".bashrc"),
+            r#"eval "$(rune completions bash)""#,
+        ),
+        "fish" => (
+            home.join(".config/fish/config.fish"),
+            "rune completions fish | source",
+        ),
+        _ => return Err(format!("Unsupported shell: {}", shell)),
+    };
+
+    // Check if already configured
+    if config_file.exists() {
+        let content = fs::read_to_string(&config_file)
+            .map_err(|e| format!("Failed to read {}: {}", config_file.display(), e))?;
+        if content.contains("rune completions") {
+            println!("  ✓ Shell completions already configured");
+            return Ok(());
+        }
+    }
+
+    // Ensure parent directory exists (for fish)
+    if let Some(parent) = config_file.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create config dir: {}", e))?;
+    }
+
+    // Append completion line
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&config_file)
+        .map_err(|e| format!("Failed to open {}: {}", config_file.display(), e))?;
+
+    writeln!(file, "\n# Rune shell completions")
+        .map_err(|e| format!("Failed to write to {}: {}", config_file.display(), e))?;
+    writeln!(file, "{}", completion_line)
+        .map_err(|e| format!("Failed to write to {}: {}", config_file.display(), e))?;
+
+    println!("  ✓ Shell completions configured (restart shell to apply)");
     Ok(())
 }
 

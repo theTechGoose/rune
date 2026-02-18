@@ -72,6 +72,10 @@ enum Commands {
         /// Editor to configure
         #[arg(short, long, value_parser = ["neovim", "helix", "vscode", "zed", "sublime", "emacs"])]
         editor: Option<String>,
+
+        /// Shell to configure completions for
+        #[arg(short, long, value_parser = ["zsh", "bash", "fish"])]
+        shell: Option<String>,
     },
 
     /// Uninstall Rune (remove LSP, parser, editor integration)
@@ -167,9 +171,9 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
 
-        Commands::Install { editor } => {
+        Commands::Install { editor, shell } => {
             let editor = editor.and_then(|e| commands::Editor::from_str(&e));
-            match commands::install(editor) {
+            match commands::install(editor, shell.as_deref()) {
                 Ok(()) => ExitCode::SUCCESS,
                 Err(e) => {
                     eprintln!("Error: {}", e);
