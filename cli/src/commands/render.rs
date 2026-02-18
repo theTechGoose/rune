@@ -241,7 +241,27 @@ fn render_to_html(source: &str, filename: &str) -> String {
     text-shadow: 0 0 15px rgba(179, 133, 133, 0.3);
   }}
 
-  /* Faults - terracotta warning style */
+  /* Faults - terracotta bar style */
+  .rune-fault-bar {{
+    display: inline-flex;
+    flex-wrap: wrap;
+    row-gap: 5px;
+    background: linear-gradient(135deg, rgba(201, 130, 106, 0.15) 0%, rgba(201, 130, 106, 0.08) 100%);
+    border: 1px solid rgba(201, 130, 106, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+  }}
+  .rune-fault-item {{
+    color: #c9826a;
+    padding: 1px 10px;
+    font-size: 0.9em;
+    text-shadow: 0 0 10px rgba(201, 130, 106, 0.4);
+    border-right: 1px solid rgba(201, 130, 106, 0.15);
+  }}
+  .rune-fault-item:last-child {{
+    border-right: none;
+  }}
+  /* Keep old class for TYP enum values */
   .rune-fault {{
     color: #c9826a;
     background: linear-gradient(135deg, rgba(201, 130, 106, 0.15) 0%, rgba(201, 130, 106, 0.08) 100%);
@@ -287,6 +307,16 @@ fn render_to_html(source: &str, filename: &str) -> String {
     border-color: rgba(143, 184, 110, 0.5);
     box-shadow: 0 0 12px rgba(143, 184, 110, 0.25);
     background: rgba(143, 184, 110, 0.15);
+  }}
+
+  /* Clickable noun links */
+  a.rune-noun-link {{
+    text-decoration: none;
+    cursor: pointer;
+  }}
+  a.rune-noun-link:hover .rune-noun {{
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }}
 
   /* Smooth scroll */
@@ -370,10 +400,10 @@ fn highlight_line(line: &str, kind: Option<&LineKind>, defs: &HashMap<String, (u
         }
         Some(LineKind::Fault { names, .. }) => {
             let faults_html = names.iter()
-                .map(|f| format!(r#"<span class="rune-fault">{}</span>"#, html_escape(f)))
+                .map(|f| format!(r#"<span class="rune-fault-item">{}</span>"#, html_escape(f)))
                 .collect::<Vec<_>>()
-                .join(" ");
-            format!("{}{}", indent_str, faults_html)
+                .join("");
+            format!(r#"{}<span class="rune-fault-bar">{}</span>"#, indent_str, faults_html)
         }
         Some(LineKind::DtoDef { name, properties }) => {
             let props_str = properties.iter()
@@ -487,10 +517,16 @@ fn noun_span(name: &str, defs: &HashMap<String, (usize, Option<String>)>) -> Str
     let escaped = html_escape(name);
     match defs.get(name) {
         Some((_, Some(desc))) => {
-            format!(r#"<span class="rune-noun rune-noun-def" title="{}">{}</span>"#, html_escape(desc), escaped)
+            format!(
+                r##"<a href="#def-{}" class="rune-noun-link"><span class="rune-noun rune-noun-def" title="{}">{}</span></a>"##,
+                slug(name), html_escape(desc), escaped
+            )
         }
         Some((_, None)) => {
-            format!(r#"<span class="rune-noun rune-noun-def">{}</span>"#, escaped)
+            format!(
+                r##"<a href="#def-{}" class="rune-noun-link"><span class="rune-noun rune-noun-def">{}</span></a>"##,
+                slug(name), escaped
+            )
         }
         None => {
             format!(r#"<span class="rune-noun">{}</span>"#, escaped)

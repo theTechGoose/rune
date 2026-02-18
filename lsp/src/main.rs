@@ -196,7 +196,7 @@ impl Backend {
         for parsed_line in &lines {
             let line_num = parsed_line.line_num;
             match &parsed_line.kind {
-                LineKind::Req { noun, verb, input, output, indent } => {
+                LineKind::Req { noun, verb, input, output, indent, .. } => {
                     // Check if previous REQ's last step returned the expected DTO
                     if let (Some(req_out), Some(step_out), Some(step_line)) = (&current_req_output, &last_step_output, last_step_line) {
                         if req_out != step_out {
