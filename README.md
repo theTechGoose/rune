@@ -5,19 +5,14 @@
 <h1 align="center">Rune</h1>
 
 <p align="center">
-  Specify your requirements. Catch missing error handling before you write code.
+  Constrain what LLMs build. Get exactly what you specify.
 </p>
 
 ## Why Rune
 
-Every `db:` call can fail. Every `ex:` call can timeout. Rune makes you declare these upfront:
+LLMs hallucinate error handling. They forget edge cases. They invent APIs.
 
-```
-db:user.save(user): void
-  network-error duplicate-key
-```
-
-The LSP warns when a boundary has no faults. Your spec becomes the contract.
+Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and contracts once. The LLM implements exactly that — no more, no less.
 
 [Full syntax &rarr;](docs/rules-cheatsheet.md)
 
