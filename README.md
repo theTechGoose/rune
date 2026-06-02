@@ -1,44 +1,66 @@
-# Shape Checker
+# Rune
 
-## Quick Start
+Design a module as a tiny `.rune` spec, generate a typed scaffold from it, fill in
+the bodies, and keep the whole thing honest with the architecture linter. The spec
+is the source of truth — you regenerate from it, you don't hand-edit the structure.
 
-```sh
-deno task compile
-./dist/shape-checker .
-```
-
-If there are violations, fix them. Run again until you get `All clear — no violations found.`
-
-To check a specific directory:
+## Quick start
 
 ```sh
-./dist/shape-checker --dir path/to/dir
+deno task build          # compiles dist/rune (+ rune-lsp, rune-syntax helpers)
+./dist/rune --help       # see all commands
 ```
 
-## What This Does
+Or run from source without compiling: `deno run -A src/bootstrap/mod.ts <args>`.
 
-The binary scans a project directory and checks it against 7 architectural rules defined in the source. The rules enforce a hexagonal/modular structure specified by `src/shape-checker/domain/business/structure/canonical-paths.json`.
-
-The tool eats its own dogfood — this repo must pass with 0 violations.
-
-## Build Options
+### The loop
 
 ```sh
-deno task compile                              # default: uses deno lsp
-deno task compile 'deno lsp'                   # explicit
-deno task compile 'typescript-language-server --stdio'  # different LSP
+# 1. write a spec (one per module) at src/<module>/<module>.rune
+#    (copy example/todos/src/tasks/tasks.rune as a starting point)
+
+# 2. generate the module from it (also writes the project's deno.json import map)
+rune sync src/<module>/<module>.rune --artifact keywords.json
+
+# 3. fill in the bodies (the dev-owned mod.ts files); the sig.ts contracts are
+#    generated for you. then verify, from the project dir:
+deno check src/**/*.ts
+
+# 4. lint the result against the architecture
+rune .                   # "All clear — no violations found." = exit 0
 ```
 
-The LSP binary path gets baked in at compile time. At runtime, the tool spawns it for type-level analysis (tracing re-exports, comparing signatures, detecting polymorphism). If the LSP isn't available or doesn't support a feature, rules fall back to regex.
+Edit the spec and re-run `rune sync` anytime — `deno check` shows you exactly what
+to reconcile (a new abstract method to implement, or a stray one to delete).
+`rune sync --force` prunes files a spec no longer declares.
 
-## Running Tests
+## Language
+
+The language itself — tags, codegen templates, lint rules, folder layout — lives in
+**`keywords.json`** (the single source of truth), edited visually in **Rune Studio**:
 
 ```sh
-deno test --allow-read --allow-net --allow-env --allow-run src/
+deno task studio
 ```
 
-## Done When
+- Syntax reference: `lang/docs/spec.md`
+- Enforced rules: `lang/docs/constraints.md`
+- Worked examples: `example/todos/`
 
-1. `deno check src/bootstrap/mod.ts` passes
-2. All tests pass
-3. `./dist/shape-checker .` exits 0 with no violations
+## Commands
+
+| Command | Does |
+|---|---|
+| `rune [dir]` | lint a project against the architecture |
+| `rune sync <file.rune>` | generate/update a module from its spec |
+| `rune manifest <file.rune>` | one-shot generate (no prune) |
+| `rune validate <keywords.json>` | validate the artifact |
+| `rune lsp` / `rune fmt <file>` | language server / format (Rust helpers) |
+
+## Tests
+
+```sh
+deno test -A src/                 # the engine
+(cd rune-studio && deno test -A tests/)
+(cd lang && cargo test --workspace)   # parser + LSP
+```
