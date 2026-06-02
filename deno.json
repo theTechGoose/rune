@@ -1,5 +1,6 @@
 {
   "tasks": {
+    "hooks": "git config core.hooksPath .githooks",
     "setup": "deno run --allow-read --allow-run --allow-write src/bootstrap/config.ts && deno run --allow-read --allow-write scripts/gen-shape-docs.ts",
     "check": "deno run --allow-read --allow-write --allow-net --allow-env --allow-run src/bootstrap/mod.ts",
     "gen": "deno run --allow-read --allow-write generate.mjs",

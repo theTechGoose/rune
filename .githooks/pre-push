@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# Block direct pushes to main — deploys happen via a PR from develop into main.
+# Installed via: git config core.hooksPath .githooks  (run `deno task hooks`)
+protected="main"
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    "refs/heads/$protected")
+      echo "" >&2
+      echo "  ✋ Direct push to '$protected' is blocked." >&2
+      echo "     Push to 'develop' and open a PR into '$protected' — merging deploys." >&2
+      echo "     (Deliberate override: git push --no-verify, if protection allows.)" >&2
+      echo "" >&2
+      exit 1 ;;
+  esac
+done
+exit 0

@@ -1,41 +1,73 @@
 name: release
 
-# Cut a release by pushing a version tag:  git tag v0.1.0 && git push origin v0.1.0
+# Deploy model:
+#   - merge into `main`        -> rebuilds the rolling `latest` release (the one
+#                                 `install.sh` pulls). This is the deploy.
+#   - push a `vX.Y.Z` tag      -> a pinned snapshot release (install with
+#                                 RUNE_VERSION=vX.Y.Z); does NOT become "latest".
+# `develop` never deploys — it's the integration branch.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
-  workflow_dispatch: # allow manual runs (no upload unless a tag is present)
+  workflow_dispatch:
 
 permissions:
-  contents: write # needed to create the GitHub Release + upload assets
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  # Reset the moving `latest` release so its assets are replaced cleanly.
+  # Only on a main-branch deploy; skipped for tag pushes.
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset rolling 'latest' release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete latest --cleanup-tag --yes -R "${{ github.repository }}" || true
+
   build:
-    name: build ${{ matrix.target }}
+    needs: [prepare]
+    # Run for main deploys AND v* tags. always() so it still runs when `prepare`
+    # is skipped (tag pushes).
+    if: ${{ always() && !cancelled() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest # Apple Silicon
+          - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-13 # Intel
+          - os: macos-13
             target: x86_64-apple-darwin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
-
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
 
-      # Rust (cargo) is preinstalled on GitHub-hosted runners; build for the host.
+      - name: Resolve release tag
+        id: rel
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "rolling=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "rolling=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build rune + rune-lsp + rune-syntax
         run: deno task build
 
-      # Ad-hoc sign on macOS so the binaries run; the installer also strips
-      # quarantine on the user's side. (No paid Apple cert needed for a CLI tool.)
       - name: Ad-hoc codesign (macOS)
         if: runner.os == 'macOS'
         run: codesign -s - --force dist/rune dist/rune-lsp dist/rune-syntax
@@ -45,10 +77,15 @@ jobs:
           tar -C dist -czf "rune-${{ matrix.target }}.tar.gz" rune rune-lsp rune-syntax
           shasum -a 256 "rune-${{ matrix.target }}.tar.gz" > "rune-${{ matrix.target }}.tar.gz.sha256"
 
-      - name: Upload to the release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Publish
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: ${{ steps.rel.outputs.rolling == 'true' && 'latest (main)' || steps.rel.outputs.tag }}
+          # The rolling 'latest' is the canonical install target (make_latest);
+          # pinned v* snapshots are not, so they don't hijack `install.sh`.
+          make_latest: ${{ steps.rel.outputs.rolling == 'true' }}
+          prerelease: false
           files: |
             rune-${{ matrix.target }}.tar.gz
             rune-${{ matrix.target }}.tar.gz.sha256
