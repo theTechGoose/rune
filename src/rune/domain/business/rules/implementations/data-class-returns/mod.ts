@@ -27,7 +27,9 @@ function extractMethodReturns(sig: string): Array<{ name: string; ret: string }>
   const body = sig.match(/\{([\s\S]*)\}\s*$/);
   if (!body) return out;
   const inner = body[1];
-  const lines = inner.split(/;\s*(?=\n|$)/);
+  // Members are `;`-separated; the LSP may return them on one line or many, so
+  // split on `;` itself rather than requiring a trailing newline.
+  const lines = inner.split(/;/);
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
