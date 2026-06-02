@@ -245,3 +245,25 @@ Deno.test("parse — full example.rune fixture", async () => {
   // No parse errors on the canonical fixture.
   assertEquals(ast.errors, []);
 });
+
+Deno.test("parse — descriptions are free text (periods, @, parentheticals)", () => {
+  const rune = `[MOD] m
+[REQ] task.do(InDto): OutDto
+    task.toDto(): OutDto
+[DTO] InDto: x
+    a manager override request, e.g. WGS white-glove
+[DTO] OutDto: x
+    an operational alert to rafac@monsterrg.com (see config)
+[TYP] x: string
+    a value`;
+  const ast = parse(rune);
+  assertEquals(ast.errors, []);
+  assertEquals(
+    ast.dtos.find((d) => d.name === "InDto")?.description,
+    "a manager override request, e.g. WGS white-glove",
+  );
+  assertEquals(
+    ast.dtos.find((d) => d.name === "OutDto")?.description,
+    "an operational alert to rafac@monsterrg.com (see config)",
+  );
+});

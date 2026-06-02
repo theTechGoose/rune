@@ -27,9 +27,18 @@ fn format_content(content: &str) -> String {
     let mut in_block = false;
     let mut consecutive_empty = 0;
     let mut after_step = false;
+    // Are we inside a [PLY] block? Its case steps/faults nest one level deeper
+    // (8/10). The block closes at a blank line, the next top-level declaration, a
+    // [NEW]/[RET], or a step that returns to REQ level. We can't infer that from
+    // the already-normalized output, so track it as state and use the AUTHOR'S
+    // original indent to tell a case step (deep) from a step that closes the
+    // block (shallow) — otherwise the REQ's terminal step gets folded into the
+    // last [CSE], silently changing meaning.
+    let mut in_poly = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
+        let orig_indent = line.len() - line.trim_start().len();
 
         if trimmed.is_empty() {
             consecutive_empty += 1;
@@ -39,6 +48,7 @@ fn format_content(content: &str) -> String {
             }
             in_block = false;
             after_step = false;
+            in_poly = false;
             continue;
         }
 
@@ -50,27 +60,43 @@ fn format_content(content: &str) -> String {
             lines.push(trimmed.to_string());
             in_block = true;
             after_step = false;
+            in_poly = false;
         } else if trimmed.starts_with("[DTO]") || trimmed.starts_with("[TYP]") || trimmed.starts_with("[NON]") {
             // Definitions at column 0
             lines.push(trimmed.to_string());
             in_block = true;
             after_step = false;
-        } else if trimmed.starts_with("[PLY]") || trimmed.starts_with("[NEW]") || trimmed.starts_with("[RET]") {
-            // Tags at 4 spaces inside blocks
+            in_poly = false;
+        } else if trimmed.starts_with("[PLY]") {
+            // Opens a polymorphic block; the tag itself sits at REQ-step level (4).
             lines.push(format!("    {}", trimmed));
             after_step = false;
+            in_poly = true;
+        } else if trimmed.starts_with("[NEW]") || trimmed.starts_with("[RET]") {
+            // REQ-level tags at 4 spaces; they close any open poly block.
+            lines.push(format!("    {}", trimmed));
+            after_step = false;
+            in_poly = false;
         } else if trimmed.starts_with("[CSE]") {
-            // Case at 8 spaces
+            // A case only appears inside a [PLY] block — at 8 spaces.
             lines.push(format!("        {}", trimmed));
             after_step = false;
+            in_poly = true;
         } else if is_step_line(trimmed) {
-            // Steps at 4 spaces (or 8 inside poly block)
-            let indent = if in_poly_context(&lines) { 8 } else { 4 };
+            // A step is 8 spaces only when it's genuinely nested in a poly case —
+            // i.e. the author indented it past REQ level. A step at REQ level
+            // (shallow) closes the block and stays at 4, even right after a [PLY].
+            let indent = if in_poly && orig_indent >= 6 {
+                8
+            } else {
+                in_poly = false;
+                4
+            };
             lines.push(format!("{}{}", " ".repeat(indent), trimmed));
             after_step = true;
         } else if after_step && is_fault_line(trimmed) {
-            // Faults at 6 spaces (or 10 inside poly block)
-            let indent = if in_poly_context(&lines) { 10 } else { 6 };
+            // Faults at 6 spaces (or 10 inside a poly case)
+            let indent = if in_poly { 10 } else { 6 };
             lines.push(format!("{}{}", " ".repeat(indent), trimmed));
         } else if in_block && (trimmed.starts_with("//") || !trimmed.contains(':')) {
             // Description or comment lines at 4 spaces
@@ -113,23 +139,6 @@ fn is_fault_line(s: &str) -> bool {
         p.chars().all(|c| c.is_lowercase() || c.is_numeric() || c == '-')
             && p.chars().next().map(|c| c.is_lowercase()).unwrap_or(false)
     })
-}
-
-fn in_poly_context(lines: &[String]) -> bool {
-    // Check if we're inside a [PLY] block
-    for line in lines.iter().rev() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("[REQ]") || trimmed.starts_with("[DTO]") || trimmed.starts_with("[TYP]") || trimmed.starts_with("[NON]") {
-            return false;
-        }
-        if trimmed.starts_with("[PLY]") {
-            return true;
-        }
-        if trimmed.is_empty() {
-            // Continue checking
-        }
-    }
-    false
 }
 
 #[cfg(test)]
@@ -188,5 +197,24 @@ mod tests {
         let formatted = format_content(content);
         // Should have at most 2 empty lines between REQs
         assert!(!formatted.contains("\n\n\n\n"));
+    }
+
+    #[test]
+    fn terminal_step_after_ply_stays_at_req_level() {
+        // The REQ's final step sits at indent 4 right after a [PLY] block; it must
+        // NOT be folded into the last [CSE] (which would change its meaning).
+        let input = "[REQ] n.send(InDto): OutDto\n    [PLY] ch.deliver(InDto): OutDto\n        [CSE] email\n        ex:ch.mail(InDto): OutDto\n          timeout\n    n.toDto(): OutDto\n";
+        let out = format_content(input);
+        // the terminal step keeps 4 spaces; the case step stays at 8
+        assert!(out.contains("\n    n.toDto(): OutDto"), "terminal step must stay at indent 4, got:\n{out}");
+        assert!(out.contains("\n        ex:ch.mail(InDto): OutDto"), "case step must stay at indent 8");
+    }
+
+    #[test]
+    fn description_with_punctuation_is_untouched() {
+        // (sanity) descriptions are free text; the formatter shouldn't choke on them
+        let input = "[DTO] FooDto: x\n    an alert to rafac@monsterrg.com e.g. WGS\n";
+        let out = format_content(input);
+        assert!(out.contains("rafac@monsterrg.com e.g. WGS"));
     }
 }
