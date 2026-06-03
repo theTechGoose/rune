@@ -15,6 +15,7 @@
     "jsr:@std/path@1": "1.1.4",
     "jsr:@std/path@^1.1.4": "1.1.4",
     "jsr:@std/text@~1.0.7": "1.0.17",
+    "jsr:@std/yaml@*": "1.0.8",
     "jsr:@std/yaml@1": "1.0.8",
     "npm:@anthropic-ai/claude-agent-sdk@*": "0.2.87_zod@4.3.6",
     "npm:rxjs@*": "7.8.2",
@@ -52,7 +53,7 @@
         "jsr:@cliffy/command",
         "jsr:@std/fs",
         "jsr:@std/path@1",
-        "jsr:@std/yaml"
+        "jsr:@std/yaml@1"
       ]
     },
     "@mrg-keystone/sprig@0.1.2": {
@@ -61,7 +62,7 @@
         "jsr:@cliffy/command",
         "jsr:@std/fs",
         "jsr:@std/path@1",
-        "jsr:@std/yaml"
+        "jsr:@std/yaml@1"
       ]
     },
     "@std/assert@1.0.18": {
