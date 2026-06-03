@@ -37,13 +37,19 @@ jobs:
     # is skipped (tag pushes).
     if: ${{ always() && !cancelled() && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: ${{ matrix.os }}
+    # Generous ceiling so a real hang fails fast instead of burning a runner.
+    # (Note: this governs EXECUTION time, not queue wait — the old Intel job was
+    # killed by GitHub's 24h *queue* limit because macos-13 runners were
+    # unavailable. The fix is below: build x86_64-darwin by CROSS-COMPILING on a
+    # plentiful macos-latest (Apple-silicon) runner, so no Intel runner is needed.)
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-latest            # was macos-13; cross-compiled from arm64
             target: x86_64-apple-darwin
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
@@ -65,8 +71,21 @@ jobs:
             echo "rolling=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build rune + rune-lsp + rune-syntax
-        run: deno task build
+      # Build for matrix.target explicitly (instead of `deno task build`, which is
+      # host-only) so we can cross-compile x86_64-apple-darwin on an arm64 runner.
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build rune + rune-lsp + rune-syntax (target ${{ matrix.target }})
+        run: |
+          deno run --allow-read --allow-run --allow-write src/bootstrap/config.ts
+          deno run --allow-read --allow-write scripts/gen-shape-docs.ts
+          deno compile --allow-read --allow-write --allow-net --allow-env --allow-run \
+            --target ${{ matrix.target }} -o dist/rune src/bootstrap/mod.ts
+          (cd lang && cargo build --release --target ${{ matrix.target }})
+          mkdir -p dist
+          cp "lang/target/${{ matrix.target }}/release/rune-lsp" \
+             "lang/target/${{ matrix.target }}/release/rune-syntax" dist/
 
       - name: Ad-hoc codesign (macOS)
         if: runner.os == 'macOS'
