@@ -59,11 +59,11 @@ Each step's return value is added to scope for subsequent steps.
 
 ### Constructor shorthand
 
-Use `[CTR]` to instantiate a class:
+Use `[NEW]` to instantiate a class (`[CTR]` is accepted as a synonym):
 
 ```
-    [CTR] metadata
-    [CTR] storage
+    [NEW] metadata
+    [NEW] storage
 ```
 
 - No parentheses, no return type
@@ -321,7 +321,7 @@ The LSP enforces these rules:
 
 ### Constructor validation
 
-- `[CTR] class` is the only valid constructor syntax
+- `[NEW] class` is the constructor syntax (`[CTR]` is an accepted synonym)
 - Constructor must reference a defined `[TYP]` with type `Class`
 
 ### DTO description validation
@@ -386,7 +386,7 @@ All keyword tags are exactly 3 letters inside brackets (`[XXX]`). This ensures c
 | `[ENT]` | Inbound entrypoint            |
 | `[PLY]` | Polymorphic step              |
 | `[CSE]` | Case inside polymorphic block |
-| `[CTR]` | Constructor shorthand         |
+| `[NEW]` | Constructor shorthand (synonym: `[CTR]`) |
 | `[RET]` | Return value from scope       |
 | `[TYP]` | Type definition               |
 | `[DTO]` | DTO definition                |

@@ -385,8 +385,8 @@ pub fn parse_document(text: &str) -> Vec<ParsedLine> {
             continue;
         }
 
-        // [NEW] class constructor shorthand
-        if trimmed.starts_with("[NEW]") {
+        // [NEW] class constructor shorthand ([CTR] is an accepted synonym)
+        if trimmed.starts_with("[NEW]") || trimmed.starts_with("[CTR]") {
             let class_name = trimmed[5..].trim().to_string();
             if !class_name.is_empty() {
                 results.push(ParsedLine {
@@ -768,6 +768,14 @@ mod tests {
         let doc = "    [NEW] storage";
         let lines = parse_document(doc);
         assert!(matches!(&lines[0].kind, LineKind::New { class_name, indent: 4 } if class_name == "storage"));
+    }
+
+    #[test]
+    fn test_parse_ctr_synonym() {
+        // [CTR] is a backwards-compatible synonym for [NEW]; both parse to LineKind::New.
+        let doc = "    [CTR] metadata";
+        let lines = parse_document(doc);
+        assert!(matches!(&lines[0].kind, LineKind::New { class_name, indent: 4 } if class_name == "metadata"));
     }
 
     #[test]

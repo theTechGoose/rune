@@ -72,7 +72,7 @@ fn format_content(content: &str) -> String {
             lines.push(format!("    {}", trimmed));
             after_step = false;
             in_poly = true;
-        } else if trimmed.starts_with("[NEW]") || trimmed.starts_with("[RET]") {
+        } else if trimmed.starts_with("[NEW]") || trimmed.starts_with("[CTR]") || trimmed.starts_with("[RET]") {
             // REQ-level tags at 4 spaces; they close any open poly block.
             lines.push(format!("    {}", trimmed));
             after_step = false;
