@@ -130,27 +130,24 @@ guess. To learn interactively, `deno task studio` documents every construct live
 
 ## The lifecycle: write → generate → fill in → verify → lint
 
-Put one spec per module in a **`specs/` directory at the project root** —
-`<project>/specs/<module>.rune` — *not* inside `src/`. Then, from the project
-root:
+**Where output goes — dead simple, from the spec's own location (not cwd):**
+`rune sync <spec>.rune` scaffolds into `<spec-dir>/src/<module>/` — right beside
+the spec — and then **moves the spec into that module** (`src/<module>/<spec>.rune`).
+So you can just point at a fresh spec:
 
 ```sh
-rune sync specs/<module>.rune --artifact keywords.json
+rune sync path/to/<module>.rune          # or: rune path/to/<module>.rune
 ```
 
 (In the repo without an installed binary, use
 `deno run -A src/bootstrap/mod.ts sync …`.)
 
-**How the output location is chosen (and why it's safe):** `rune sync` always
-writes to `<root>/src/<module>/`, and resolves `<root>` from the spec's path —
-specifically the directory directly above the **outermost `src/` segment** in that
-path (or, if the path has no `src/`, the parent of a `specs/` dir, else the spec's
-own dir). This is independent of cwd, so it never matters which directory you run
-`rune sync` from. It's also nesting-immune: point it at a spec **anywhere under the
-project** — even an accidentally nested `src/<module>/src/<module>/<module>.rune` —
-and it collapses back to the one canonical `src/<module>/`. Pass `--root <dir>` to
-override explicitly. Keeping the spec in `specs/` (outside the tree it generates)
-is still the cleanest layout — the spec is never an orphan-prune candidate.
+After the first run the spec lives at `<root>/src/<module>/<module>.rune`.
+Re-syncing it from there is idempotent: when the spec already sits inside a
+`src/<module>/`, the root is taken as the dir above that `src/`, so it updates in
+place and never nests `src/<module>/src/<module>/`. Only the spec's immediate
+parents are inspected, so a `src` directory higher up the path can't hijack the
+root. Pass `--root <dir>` to scaffold somewhere other than beside the spec.
 
 This is one repeating cycle — **write → generate → fill in → verify → lint** —
 not a one-shot. Each step:

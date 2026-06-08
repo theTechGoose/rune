@@ -97,7 +97,28 @@ if (Deno.args[0] === "validate") {
 
 const { dir, module: moduleName, suggest, json } = parseArgs(Deno.args);
 
+// Dead-simple ergonomics: `rune <spec>.rune [flags]` just syncs that spec — no
+// `sync` subcommand needed. `rune [dir]` (or no arg) still lints a project.
+if (dir.endsWith(".rune")) {
+  Deno.exit(await runSync(Deno.args));
+}
+
 const targetDir = resolve(dir);
+
+// `rune [dir]` lints a project DIRECTORY; reject a non-directory cleanly instead
+// of crashing deep in a git spawn.
+let targetStat: Deno.FileInfo | null = null;
+try {
+  targetStat = Deno.statSync(targetDir);
+} catch {
+  console.error(`rune: no such file or directory: ${dir}`);
+  Deno.exit(2);
+}
+if (!targetStat.isDirectory) {
+  console.error(`rune: '${dir}' is not a directory.`);
+  Deno.exit(2);
+}
+
 const ignoredPaths = await getIgnoredPaths(targetDir);
 
 let scanDir = targetDir;

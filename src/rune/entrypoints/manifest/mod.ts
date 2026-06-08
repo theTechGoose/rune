@@ -15,7 +15,7 @@ const RESET = "\x1b[0m";
 
 interface ManifestArgs {
   runePath: string;
-  root: string | null; // null = not given → discover from the spec path
+  root: string | null; // null = derive from the spec's location; --root overrides
   json: boolean;
   artifactPath: string | null;
 }
@@ -38,20 +38,13 @@ function parseManifestArgs(args: string[]): ManifestArgs | null {
   return { runePath, root, json, artifactPath };
 }
 
-// Resolve the project root from the spec's path — independent of cwd AND of how
-// deeply the spec is nested. Output is always `<root>/src/<module>/`, and <root>
-// is the directory directly above the OUTERMOST `src/` segment in the spec's path.
-// So a spec located anywhere under the tree — even an accidentally nested
-// `…/src/<m>/src/<m>/<m>.rune` — collapses back to the single canonical
-// `…/src/<m>/` location instead of mirroring the nesting into the output.
-// `--root` overrides this entirely.
-function discoverRoot(absRune: string): string {
-  const parts = absRune.split("/");
-  const srcIdx = parts.indexOf("src"); // outermost src/ in the path
-  if (srcIdx > 0) return parts.slice(0, srcIdx).join("/");
-  // No src/ in the path: a spec in `<root>/specs/` → `<root>`; else the spec dir.
+// Where to scaffold, derived from the spec's OWN location (not cwd): if the spec
+// already lives inside a `src/<module>/`, root is the dir above that `src/`;
+// otherwise scaffold right beside the spec. Only the spec's immediate parents are
+// inspected, so a `src` dir higher up can't hijack the root. `--root` overrides.
+function resolveRoot(absRune: string): string {
   const specDir = dirname(absRune);
-  if (basename(specDir) === "specs") return dirname(specDir);
+  if (basename(dirname(specDir)) === "src") return dirname(dirname(specDir));
   return specDir;
 }
 
@@ -95,7 +88,7 @@ export async function runManifest(args: string[]): Promise<number> {
   }
 
   const absRune = resolve(parsed.runePath);
-  const root = parsed.root !== null ? resolve(parsed.root) : discoverRoot(absRune);
+  const root = parsed.root !== null ? resolve(parsed.root) : resolveRoot(absRune);
   const relRune = relative(root, absRune);
 
   let runeText: string;

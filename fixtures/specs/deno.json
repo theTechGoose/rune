@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "@/": "./",
+    "#zod": "npm:zod",
+    "#std/assert": "jsr:@std/assert",
+    "#std/path": "jsr:@std/path"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}

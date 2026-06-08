@@ -1,0 +1,48 @@
+[MOD] library
+
+[REQ] book.add(AddBookDto): BookDto
+    id::generate(): id
+    [NEW] book
+    book.fill(title): book
+    db:book.save(BookDto): void
+      timeout
+    book.toDto(): BookDto
+
+[REQ] book.borrow(BorrowDto): BookDto
+    db:book.load(id): BookDto
+      not-found
+    book.markBorrowed(): book
+    db:book.save(BookDto): void
+      timeout
+    book.toDto(): BookDto
+
+[REQ] member.register(RegisterDto): MemberDto
+    id::generate(): id
+    [NEW] member
+    member.fill(name): member
+    db:member.save(MemberDto): void
+      timeout
+    member.toDto(): MemberDto
+
+[TYP] id: string
+    a unique identifier
+[TYP] title: string
+    the book title
+[TYP] name: string
+    the member name
+
+[DTO] AddBookDto: title
+    input to add a new book
+[DTO] BorrowDto: id
+    a reference to a book to borrow
+[DTO] BookDto: id, title, borrowed
+    a persisted catalog book
+[DTO] RegisterDto: name
+    input to register a member
+[DTO] MemberDto: id, name
+    a persisted library member
+
+[NON] book
+    a single book in the catalog
+[NON] member
+    a registered library member
