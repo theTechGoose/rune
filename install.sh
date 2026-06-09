@@ -4,7 +4,7 @@
 # Installs CLEANLY: it first UNINSTALLS any existing rune (every known location),
 # then installs one fresh copy — so you never accumulate stale/duplicate binaries.
 #
-#   curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/install.sh | sh
 #
 # Options (env vars):
 #   RUNE_INSTALL   install dir (default: ~/.deno/bin)
@@ -15,7 +15,7 @@
 # `deno lsp`. Set SHAPE_NO_LSP=1 to skip them.
 set -eu
 
-REPO="theTechGoose/rune"
+REPO="mrg-keystone/rune"
 BINDIR="${RUNE_INSTALL:-$HOME/.deno/bin}"
 RUNE_REF="${RUNE_REF:-main}"
 

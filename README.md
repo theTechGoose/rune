@@ -7,7 +7,7 @@ is the source of truth — you regenerate from it, you don't hand-edit the struc
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/install.sh | sh
 rune --help
 ```
 
@@ -23,7 +23,7 @@ helpers) into `~/.deno/bin` — no Deno or Rust toolchain required. Options:
   integration work, ahead of stable):
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh | RUNE_VERSION=develop sh
+  curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/install.sh | RUNE_VERSION=develop sh
   ```
 
 Supported targets: Apple-silicon macOS, Intel macOS, Linux x86-64. On macOS the
@@ -32,7 +32,7 @@ script de-quarantines the binaries so Gatekeeper doesn't block them.
 ### Uninstall
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/uninstall.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/uninstall.sh | sh
 ```
 
 Removes `rune` + `rune-lsp` + `rune-syntax` from every known install location.
@@ -43,7 +43,7 @@ Authoring `.rune` specs with Claude Code? Install the bundled skill so Claude
 knows the syntax, lifecycle, and pitfalls:
 
 ```sh
-git clone https://github.com/theTechGoose/rune     # if you don't have it already
+git clone https://github.com/mrg-keystone/rune     # if you don't have it already
 ln -s "$PWD/rune/skills/rune" ~/.claude/skills/rune  # user-scope install
 ```
 

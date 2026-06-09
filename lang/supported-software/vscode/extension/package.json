@@ -4,7 +4,7 @@
   "description": "Tree-sitter powered syntax highlighting for Rune specification files",
   "version": "0.1.0",
   "publisher": "thetechgoose",
-  "repository": "https://github.com/theTechGoose/rune",
+  "repository": "https://github.com/mrg-keystone/rune",
   "engines": { "vscode": "^1.75.0" },
   "categories": ["Programming Languages"],
   "activationEvents": ["onLanguage:rune"],

@@ -28,7 +28,7 @@ Rune is a spec format LLMs can follow precisely. Define boundaries, faults, and 
 ## Rust:    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Source
-git clone https://github.com/theTechGoose/rune.git
+git clone https://github.com/mrg-keystone/rune.git
 cd rune
 ./install-cli
 rune install -e neovim      # or helix, vscode, zed, sublime, emacs
