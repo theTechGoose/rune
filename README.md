@@ -11,7 +11,10 @@ curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/install.sh |
 rune --help
 ```
 
-This pulls the latest prebuilt release (`rune` + the `rune-lsp` / `rune-syntax`
+The installer is **idempotent**: it first removes any existing `rune` (from every
+known location — `~/.deno/bin`, `~/.cargo/bin`, `~/.local/bin`, …) and then drops
+in one fresh copy, so you never end up with stale or duplicate binaries on your
+`PATH`. Pulls the latest prebuilt release (`rune` + the `rune-lsp` / `rune-syntax`
 helpers) into `~/.deno/bin` — no Deno or Rust toolchain required. Options:
 
 - `RUNE_INSTALL=/usr/local/bin` — install somewhere else (must be on your `PATH`).
@@ -25,6 +28,14 @@ helpers) into `~/.deno/bin` — no Deno or Rust toolchain required. Options:
 
 Supported targets: Apple-silicon macOS, Intel macOS, Linux x86-64. On macOS the
 script de-quarantines the binaries so Gatekeeper doesn't block them.
+
+### Uninstall
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/theTechGoose/rune/main/uninstall.sh | sh
+```
+
+Removes `rune` + `rune-lsp` + `rune-syntax` from every known install location.
 
 ### Claude Code skill (optional)
 
