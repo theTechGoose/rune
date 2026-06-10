@@ -130,6 +130,51 @@ they all execute and combine (→ a single step, looped in the body)?**
   **one step** (e.g. `gate.evaluate(CandidateDto): ResultDto`, predicates in the
   body), **not** eleven `[CSE]`s. "There are 11 things" ≠ "there are 11 branches."
 
+### `[ENT]` is the outside edge — wire it to keep
+
+`[ENT] surface.action(InDto): OutDto` is the **inbound** edge — the HTTP route (or
+CLI/queue handler) that reaches the `[REQ]` it dispatches to. `rune sync` emits
+`src/<module>/entrypoints/<surface>/mod.ts` (dev-owned). **Fill it by writing a tiny
+keep controller — don't hand-roll routing, request parsing, or Swagger.** Decorate one
+handler per `[ENT]` and delegate to the coordinator the `[REQ]` generated:
+
+```ts
+import { Endpoint, EndpointController } from "@mrg-keystone/keep";
+import { placeOrder } from "@/src/checkout/mod-root.ts";   // the [REQ] coordinator
+
+@EndpointController("orders")            // controller surface = the [ENT] surface
+class OrdersController {
+  @Endpoint({ input: PlaceOrderDto, output: ReceiptDto, order: 1 })
+  place(body: PlaceOrderDto) { return placeOrder(body); }
+}
+```
+
+keep serves the route, generates per-module Swagger from the DTO classes, and renders
+the process emulator — all from the decorators. Type the handler param as the input
+DTO; `@Endpoint` wires the body for you (don't add `@Body()`).
+
+### Declare process order + dependencies on the endpoint
+
+Endpoints in a module run as a *process*. On each `@Endpoint` set:
+
+- `order` — position in the sequence (ascending).
+- `dependsOn` — endpoint id(s) (the handler method names) that must run first.
+- `bind` — `{ thisInputField: "otherEndpointId.outputField" }`: fill this request from
+  an earlier response.
+
+```ts
+@Endpoint({ input: CreateOrderDto, output: OrderDto, order: 1 })
+create(body: CreateOrderDto) { /* … */ }          // outputs { id }
+
+@Endpoint({ path: "pay", input: PayDto, output: ReceiptDto, order: 2,
+            dependsOn: "create", bind: { orderId: "create.id" } })
+pay(body: PayDto) { /* … */ }
+```
+
+This metadata orders the emulator's bullets and auto-chains `create`'s `id` into
+`pay`'s `orderId` (and drives the headless runner). Treat it as part of the contract,
+like the REQ inventory.
+
 ## The rules that bite (from constraints.md)
 
 These are the ones that cause "won't parse / won't lint" surprises:
@@ -215,6 +260,27 @@ This is one repeating cycle — **write → check → generate → fill in → v
    by default (so a spec edit can't silently delete your code). Re-run with
    `--force` to remove them: `rune sync … --force`.
 
+## Verify via the emulator (and headless runner)
+
+After `rune sync` + filling bodies + `deno check` + `rune lint`, **serve the app and
+open `/docs/<module>`** — keep renders a per-module **process emulator**: the endpoints
+as an ordered, bulleted checklist. Click **Emulate process** down the list (or **Run all
+in order**) and read each response; a green checkmark on every step means the rune's
+logic actually works, not just type-checks. Each success captures its output and
+pre-fills the next dependent step (`bind`). Standard Swagger UI is at
+`/docs/<module>/swagger`, the raw spec at `/docs/<module>/json`.
+
+For CI / unattended runs, call the same thing in code:
+
+```ts
+import { exerciseEndpoints } from "@mrg-keystone/keep";
+const report = await exerciseEndpoints({ api });   // in-process; { passed, failed, … }
+```
+
+Pass `overrides.seeds` / `overrides.byEndpoint` for values the chain can't produce (and
+`overrides.auth` to bootstrap a token), and `rateLimit` so retries don't hammer the
+server. Re-run after every spec change.
+
 ## Pitfalls (learned the hard way)
 
 - **Don't name a verb after a JS/TS reserved word** — `delete`, `new`, `class`,
@@ -239,6 +305,9 @@ This is one repeating cycle — **write → check → generate → fill in → v
   anymore — feature/adapter classes are concrete.)
 - Don't add language features by editing engine code — edit `keywords.json` (via
   the Studio); it's the single source of truth.
+- Don't hand-roll routing, request parsing, Swagger, or a dependency/run loop in an
+  entrypoint `mod.ts` — decorate a handler with keep's `@Endpoint` (declaring
+  `order`/`dependsOn`/`bind`) and let keep build the emulator + harness.
 
 ## Worked examples
 
