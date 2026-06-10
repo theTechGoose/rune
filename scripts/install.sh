@@ -1,18 +1,20 @@
 #!/usr/bin/env sh
-# Install the rune CLI (rune + rune-lsp + rune-syntax) from GitHub Releases.
+# Install the rune CLI (rune + rune-lsp + rune-syntax) from GitHub Releases,
+# plus the rune Claude Code skill into user scope (~/.claude/skills/rune).
 #
 # Installs CLEANLY: it first UNINSTALLS any existing rune (every known location),
 # then installs one fresh copy — so you never accumulate stale/duplicate binaries.
 #
-#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh | sh
 #
 # Local dev build (compile from THIS checkout, skip the GitHub release):
-#   ./install.sh --dev
+#   deno task install        (= sh scripts/install.sh --dev)
 #
 # Options (env vars):
-#   RUNE_INSTALL   install dir (default: ~/.deno/bin)
-#   RUNE_VERSION   tag to install (default: latest release; e.g. develop, v0.1.0)
-#   RUNE_REF       branch to fetch uninstall.sh from (default: main)
+#   RUNE_INSTALL        install dir (default: ~/.deno/bin)
+#   RUNE_VERSION        tag to install (default: latest release; e.g. develop, v0.1.0)
+#   RUNE_REF            ref to fetch uninstall.sh + the skill from (default: main)
+#   CLAUDE_SKILLS_DIR   Claude Code skills dir (default: ~/.claude/skills)
 #
 # Prerequisite: `deno` on your PATH — the linter's type-aware rules spawn
 # `deno lsp`. Set SHAPE_NO_LSP=1 to skip them.
@@ -24,6 +26,24 @@ RUNE_REF="${RUNE_REF:-main}"
 # The binaries this installer manages. Add a fourth here and every loop below
 # (purge / chmod / xattr / codesign) picks it up — no other edit needed.
 BINS="rune rune-lsp rune-syntax"
+SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
+
+# install_skill <path-to-SKILL.md> — install the rune Claude Code skill into
+# user scope, so the assistant always matches the installed toolchain. Skipped
+# when ~/.claude is absent (no Claude Code on this machine). Only SKILL.md is
+# managed — anything else in the skill folder (evals/, notes) is the user's. A
+# symlinked skill dir (the old README setup) is replaced with a real dir so we
+# never write through the link into someone's checkout.
+install_skill() {
+  if [ ! -d "$HOME/.claude" ]; then
+    echo "rune: ~/.claude not found — skipping the Claude Code skill."
+    return 0
+  fi
+  [ -L "$SKILLS_DIR/rune" ] && rm -f "$SKILLS_DIR/rune"
+  mkdir -p "$SKILLS_DIR/rune"
+  cp "$1" "$SKILLS_DIR/rune/SKILL.md"
+  echo "Installed the rune skill -> $SKILLS_DIR/rune/SKILL.md"
+}
 
 # --dev: build + install from this local checkout instead of a GitHub release.
 DEV=0
@@ -34,7 +54,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 # --- 1. Uninstall any prior copy first (install = uninstall + fresh install) ---
 echo "Removing any existing rune install…"
-if curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/uninstall.sh" \
+if curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/scripts/uninstall.sh" \
      -o "$tmp/uninstall.sh" 2>/dev/null; then
   RUNE_INSTALL="$BINDIR" sh "$tmp/uninstall.sh" || true
 else
@@ -47,9 +67,11 @@ fi
 
 # --- 1b. --dev: compile + install from the local checkout (no release needed) ---
 if [ "$DEV" = "1" ]; then
-  repo="$(cd "$(dirname "$0")" && pwd)"
+  # The script lives in <repo>/scripts/, so the checkout root is one level up.
+  repo="$(cd "$(dirname "$0")/.." && pwd)"
   [ -f "$repo/src/bootstrap/mod.ts" ] || {
-    echo "rune: --dev must be run as ./install.sh --dev from a rune checkout" >&2
+    echo "rune: --dev must be run as \`deno task install\` (or" >&2
+    echo "      \`sh scripts/install.sh --dev\`) from a rune checkout" >&2
     echo "      (no src/bootstrap/mod.ts found at $repo)." >&2
     exit 1
   }
@@ -73,6 +95,7 @@ if [ "$DEV" = "1" ]; then
   if [ "$(uname -s)" = "Darwin" ]; then
     for b in $BINS; do codesign -f -s - "$BINDIR/$b" 2>/dev/null || true; done
   fi
+  install_skill "$repo/skills/rune/SKILL.md"
   echo "Installed rune (dev build from $repo) -> $BINDIR"
   command -v deno >/dev/null 2>&1 && echo "Run: rune --help"
   exit 0
@@ -103,13 +126,29 @@ url="https://github.com/$REPO/releases/download/$tag/rune-$target.tar.gz"
 echo "Downloading rune $tag ($target)…"
 curl -fSL "$url" -o "$tmp/rune.tar.gz"
 
-mkdir -p "$BINDIR"
-tar -C "$BINDIR" -xzf "$tmp/rune.tar.gz"
-for b in $BINS; do chmod +x "$BINDIR/$b"; done
+# Unpack to a staging dir (the tarball also carries SKILL.md, which must not
+# land in BINDIR), then move the binaries into place.
+mkdir -p "$tmp/pkg" "$BINDIR"
+tar -C "$tmp/pkg" -xzf "$tmp/rune.tar.gz"
+for b in $BINS; do
+  mv -f "$tmp/pkg/$b" "$BINDIR/$b"
+  chmod +x "$BINDIR/$b"
+done
 
 # Let Gatekeeper run the freshly downloaded macOS binaries.
 if [ "$os" = "Darwin" ]; then
   for b in $BINS; do xattr -d com.apple.quarantine "$BINDIR/$b" 2>/dev/null || true; done
+fi
+
+# The skill ships inside the release tarball, version-matched to the binaries.
+# Releases that predate that fall back to the repo at $RUNE_REF.
+if [ -f "$tmp/pkg/SKILL.md" ]; then
+  install_skill "$tmp/pkg/SKILL.md"
+elif curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/skills/rune/SKILL.md" \
+     -o "$tmp/SKILL.md" 2>/dev/null; then
+  install_skill "$tmp/SKILL.md"
+else
+  echo "rune: could not fetch the rune skill — binaries installed, skill left as-is." >&2
 fi
 
 echo "Installed rune $tag -> $BINDIR"

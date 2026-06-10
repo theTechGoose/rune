@@ -1,5 +1,5 @@
 import { dirname, fromFileUrl, join, resolve } from "#std/path";
-import { rules, runPipeline, parseArgs, printHeader, printResults, printJson, runManifest, runSync, runCheck, runValidate } from "@rune/mod-root.ts";
+import { rules, runPipeline, parseArgs, printHeader, printResults, printJson, runManifest, runSync, runCheck, runValidate, runUpdate } from "@rune/mod-root.ts";
 import { getIgnoredPaths } from "@rune/domain/data/project/mod.ts";
 import { suggestForResults } from "@rune/domain/data/llm/openai.ts";
 import { canonicalPaths as SHAPE } from "@rune/domain/business/artifact/canonical-paths.ts";
@@ -34,6 +34,7 @@ USAGE
   rune validate <art.json>   validate a keywords.json artifact
   rune lsp                   start the language server (editor integration)
   rune fmt <file.rune>       format a spec
+  rune update [tag]          self-update to the latest release (or a pinned tag)
 
 Generation is Deno/TypeScript. Edit the language in Rune Studio
 (\`deno task studio\`) — it writes keywords.json, the single source of truth.`);
@@ -115,6 +116,11 @@ if (Deno.args[0] === "check") {
 
 if (Deno.args[0] === "validate") {
   const code = await runValidate(Deno.args.slice(1));
+  Deno.exit(code);
+}
+
+if (Deno.args[0] === "update" || Deno.args[0] === "upgrade") {
+  const code = await runUpdate(Deno.args.slice(1));
   Deno.exit(code);
 }
 

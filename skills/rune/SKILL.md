@@ -32,6 +32,7 @@ rune manifest <file.rune>  # one-shot generate (no prune)
 rune fmt   <file.rune>     # format a spec
 rune validate <art.json>   # validate a keywords.json artifact
 rune lsp                   # language server — the editor's red squiggles mirror `rune check`
+rune update [tag]          # self-update to the latest release (also refreshes THIS skill); `upgrade` works too
 ```
 
 **To check if a rune is good, run `rune check <file.rune>`** — it runs the exact

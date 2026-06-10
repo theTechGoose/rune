@@ -7,7 +7,7 @@ is the source of truth — you regenerate from it, you don't hand-edit the struc
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh | sh
 rune --help
 ```
 
@@ -15,7 +15,12 @@ The installer is **idempotent**: it first removes any existing `rune` (from ever
 known location — `~/.deno/bin`, `~/.cargo/bin`, `~/.local/bin`, …) and then drops
 in one fresh copy, so you never end up with stale or duplicate binaries on your
 `PATH`. Pulls the latest prebuilt release (`rune` + the `rune-lsp` / `rune-syntax`
-helpers) into `~/.deno/bin` — no Deno or Rust toolchain required. Options:
+helpers) into `~/.deno/bin` — no Deno or Rust toolchain required. It also installs
+the **rune Claude Code skill** into `~/.claude/skills/rune/` (skipped when
+`~/.claude` doesn't exist), so Claude always matches the installed toolchain.
+
+Already installed? `rune update` (alias: `rune upgrade`) re-runs this installer —
+binaries *and* skill. Options:
 
 - `RUNE_INSTALL=/usr/local/bin` — install somewhere else (must be on your `PATH`).
 - `RUNE_VERSION=v0.1.0` — pin a specific snapshot instead of the rolling latest.
@@ -23,7 +28,7 @@ helpers) into `~/.deno/bin` — no Deno or Rust toolchain required. Options:
   integration work, ahead of stable):
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/install.sh | RUNE_VERSION=develop sh
+  curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh | RUNE_VERSION=develop sh
   ```
 
 Supported targets: Apple-silicon macOS, Intel macOS, Linux x86-64. On macOS the
@@ -32,26 +37,29 @@ script de-quarantines the binaries so Gatekeeper doesn't block them.
 ### Uninstall
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/uninstall.sh | sh
+curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/uninstall.sh | sh
+# or, from a checkout: deno task uninstall
 ```
 
-Removes `rune` + `rune-lsp` + `rune-syntax` from every known install location.
+Removes `rune` + `rune-lsp` + `rune-syntax` from every known install location,
+plus the managed skill file (`~/.claude/skills/rune/SKILL.md`) — anything else
+you keep in that folder (evals, notes) is left alone.
 
-### Claude Code skill (optional)
+### Claude Code skill
 
-Authoring `.rune` specs with Claude Code? Install the bundled skill so Claude
-knows the syntax, lifecycle, and pitfalls:
-
-```sh
-git clone https://github.com/mrg-keystone/rune     # if you don't have it already
-ln -s "$PWD/rune/skills/rune" ~/.claude/skills/rune  # user-scope install
-```
+Installed for you: the skill ships inside every release tarball, and every
+install path (`scripts/install.sh`, `deno task install`, `rune update`) drops it
+into `~/.claude/skills/rune/` so Claude knows the syntax, lifecycle, and pitfalls
+of the version you actually have — a pinned `RUNE_VERSION` install gets the skill
+matching those binaries. Working on the skill itself? `deno task install`
+copies it straight from your checkout.
 
 ## Build from source (contributors)
 
 ```sh
 deno task build          # compiles dist/rune (+ rune-lsp, rune-syntax helpers)
 ./dist/rune --help       # see all commands
+deno task install        # or: build from this checkout straight into ~/.deno/bin
 ```
 
 Or run from source without compiling: `deno run -A src/bootstrap/mod.ts <args>`.
@@ -99,6 +107,7 @@ deno task studio
 | `rune manifest <file.rune>` | one-shot generate (no prune) |
 | `rune validate <keywords.json>` | validate the artifact |
 | `rune lsp` / `rune fmt <file>` | language server / format (Rust helpers) |
+| `rune update [tag]` | self-update binaries + Claude skill (alias: `upgrade`) |
 
 ## Tests
 

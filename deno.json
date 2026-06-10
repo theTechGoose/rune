@@ -9,7 +9,9 @@
     "build:rust": "cd lang && cargo build --release",
     "compile": "deno task setup && deno compile --allow-read --allow-write --allow-net --allow-env --allow-run -o dist/rune src/bootstrap/mod.ts",
     "build": "deno task compile && deno task build:rust && mkdir -p dist && cp lang/target/release/rune-lsp lang/target/release/rune-syntax dist/",
-    "install": "deno task build && cp dist/rune dist/rune-lsp dist/rune-syntax ~/.deno/bin/ && (codesign -f -s - ~/.deno/bin/rune-lsp ~/.deno/bin/rune-syntax 2>/dev/null || true)",
+    "install": "sh scripts/install.sh --dev",
+    "install:release": "sh scripts/install.sh",
+    "uninstall": "sh scripts/uninstall.sh",
     "verify": "deno run -A scripts/verify.ts"
   },
   "imports": {

@@ -106,8 +106,11 @@ jobs:
         run: codesign -s - --force dist/rune dist/rune-lsp dist/rune-syntax
 
       - name: Package
+        # The Claude Code skill ships INSIDE the tarball so a pinned install gets
+        # the skill matching its binaries (install.sh extracts and places it).
         run: |
-          tar -C dist -czf "rune-${{ matrix.target }}.tar.gz" rune rune-lsp rune-syntax
+          cp skills/rune/SKILL.md dist/
+          tar -C dist -czf "rune-${{ matrix.target }}.tar.gz" rune rune-lsp rune-syntax SKILL.md
           shasum -a 256 "rune-${{ matrix.target }}.tar.gz" > "rune-${{ matrix.target }}.tar.gz.sha256"
 
       - name: Publish

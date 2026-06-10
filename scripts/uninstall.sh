@@ -3,7 +3,7 @@
 # install (current or legacy) may have placed them, so no stale/duplicate copies
 # linger on your PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/uninstall.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/uninstall.sh | sh
 #
 # RUNE_INSTALL — also clean this dir (the install target; default ~/.deno/bin).
 set -u
@@ -40,6 +40,20 @@ for d in $dirs; do
     fi
   done
 done
+
+# The rune Claude Code skill (user scope). Only the managed SKILL.md is removed
+# — anything else in the folder (evals/, notes) is the user's. A symlinked skill
+# dir (the old README setup) is unlinked, never followed into a checkout.
+skilldir="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}/rune"
+if [ -L "$skilldir" ]; then
+  rm -f "$skilldir" && echo "removed $skilldir (symlink)" && removed=$((removed + 1))
+elif [ -e "$skilldir/SKILL.md" ]; then
+  if rm -f "$skilldir/SKILL.md" 2>/dev/null; then
+    echo "removed $skilldir/SKILL.md"
+    removed=$((removed + 1))
+    rmdir "$skilldir" 2>/dev/null || true
+  fi
+fi
 
 if [ "$removed" -eq 0 ]; then
   echo "rune: nothing to uninstall."
