@@ -1,19 +1,30 @@
 [MOD] checkout
 
-[ENT] http.placeOrder(PlaceOrderDto): ReceiptDto
+[ENT] http.createOrder(NewOrderDto): OrderDto
+[ENT] http.payOrder(PayDto): ReceiptDto
 
-[REQ] order.place(PlaceOrderDto): ReceiptDto
-    db:order.save(PlaceOrderDto): ReceiptDto
+[REQ] order.create(NewOrderDto): OrderDto
+    db:order.save(OrderDto): void
+      timeout
+    [RET] OrderDto
+
+[REQ] payment.pay(PayDto): ReceiptDto
+    db:payment.charge(PayDto): ReceiptDto
       timeout
     [RET] ReceiptDto
 
-[DTO] PlaceOrderDto: items
-    an order to place
+[DTO] NewOrderDto: item
+    a new order to create
+[DTO] OrderDto: id, item
+    a created order
+[DTO] PayDto: id
+    a payment for an order
+[DTO] ReceiptDto: receipt
+    a receipt for a payment
 
-[DTO] ReceiptDto: id
-    the receipt for a placed order
-
-[TYP] items: string
-    the items
+[TYP] item: string
+    the item to order
 [TYP] id: string
-    the id
+    the order id
+[TYP] receipt: string
+    the receipt code

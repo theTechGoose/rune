@@ -3,9 +3,9 @@
   "reqs": [
     {
       "noun": "order",
-      "verb": "place",
-      "input": "PlaceOrderDto",
-      "output": "ReceiptDto",
+      "verb": "create",
+      "input": "NewOrderDto",
+      "output": "OrderDto",
       "steps": [
         {
           "kind": "boundary",
@@ -13,54 +13,131 @@
           "noun": "order",
           "verb": "save",
           "params": [
-            "PlaceOrderDto"
+            "OrderDto"
+          ],
+          "output": "void",
+          "isStatic": false,
+          "faults": [
+            "timeout"
+          ],
+          "line": 6
+        },
+        {
+          "kind": "ret",
+          "value": "OrderDto",
+          "line": 8
+        }
+      ],
+      "line": 5
+    },
+    {
+      "noun": "payment",
+      "verb": "pay",
+      "input": "PayDto",
+      "output": "ReceiptDto",
+      "steps": [
+        {
+          "kind": "boundary",
+          "tag": "db",
+          "noun": "payment",
+          "verb": "charge",
+          "params": [
+            "PayDto"
           ],
           "output": "ReceiptDto",
           "isStatic": false,
           "faults": [
             "timeout"
           ],
-          "line": 5
+          "line": 11
         },
         {
           "kind": "ret",
           "value": "ReceiptDto",
-          "line": 7
+          "line": 13
         }
       ],
-      "line": 4
+      "line": 10
     }
   ],
   "ents": [
     {
       "surface": "http",
-      "action": "placeOrder",
-      "input": "PlaceOrderDto",
-      "output": "ReceiptDto",
+      "action": "createOrder",
+      "input": "NewOrderDto",
+      "output": "OrderDto",
       "line": 2
+    },
+    {
+      "surface": "http",
+      "action": "payOrder",
+      "input": "PayDto",
+      "output": "ReceiptDto",
+      "line": 3
     }
   ],
   "dtos": [
     {
-      "name": "PlaceOrderDto",
+      "name": "NewOrderDto",
       "properties": [
-        "items"
+        "item"
       ],
-      "description": "an order to place",
+      "description": "a new order to create",
       "isCore": false,
-      "line": 9
+      "line": 15
+    },
+    {
+      "name": "OrderDto",
+      "properties": [
+        "id",
+        "item"
+      ],
+      "description": "a created order",
+      "isCore": false,
+      "line": 17
+    },
+    {
+      "name": "PayDto",
+      "properties": [
+        "id"
+      ],
+      "description": "a payment for an order",
+      "isCore": false,
+      "line": 19
     },
     {
       "name": "ReceiptDto",
       "properties": [
-        "id"
+        "receipt"
       ],
-      "description": "the receipt for a placed order",
+      "description": "a receipt for a payment",
       "isCore": false,
-      "line": 12
+      "line": 21
     }
   ],
-  "typs": [],
+  "typs": [
+    {
+      "name": "item",
+      "typeName": "string",
+      "description": "the item to order",
+      "isCore": false,
+      "line": 24
+    },
+    {
+      "name": "id",
+      "typeName": "string",
+      "description": "the order id",
+      "isCore": false,
+      "line": 26
+    },
+    {
+      "name": "receipt",
+      "typeName": "string",
+      "description": "the receipt code",
+      "isCore": false,
+      "line": 28
+    }
+  ],
   "nons": [],
   "errors": []
 }

@@ -3,8 +3,8 @@
 
 import { IsString } from "class-validator";
 
-// a receipt for a payment
-export class ReceiptDto {
+// a new order to create
+export class NewOrderDto {
   @IsString()
-  receipt!: string;
+  item!: string;
 }

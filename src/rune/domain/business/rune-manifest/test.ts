@@ -1,4 +1,4 @@
-import { assertEquals } from "#std/assert";
+import { assertEquals, assertStringIncludes } from "#std/assert";
 import { artifactToOptions, planManifest } from "./mod.ts";
 
 Deno.test("planManifest — coordinator + DTO + TYP for a simple rune", () => {
@@ -135,6 +135,62 @@ Deno.test("planManifest — [ENT] produces entrypoint folder", () => {
     paths.includes("src/recording/entrypoints/http/e2e.test.ts"),
     true,
   );
+});
+
+Deno.test("planManifest — [ENT]s on one surface become one keep controller", () => {
+  const rune = `[MOD] checkout
+
+[ENT] http.createOrder(NewOrderDto): OrderDto
+[ENT] http.payOrder(PayDto): ReceiptDto
+
+[REQ] order.create(NewOrderDto): OrderDto
+    [NEW] order
+    [RET] OrderDto
+
+[REQ] payment.pay(PayDto): ReceiptDto
+    [NEW] payment
+    [RET] ReceiptDto
+
+[DTO] NewOrderDto: item
+    a new order
+[DTO] OrderDto: id, item
+    a created order
+[DTO] PayDto: id
+    a payment
+[DTO] ReceiptDto: receipt
+    a receipt
+
+[TYP] item: string
+    x
+[TYP] id: string
+    x
+[TYP] receipt: string
+    x`;
+  const plan = planManifest("specs/checkout.rune", rune, new Set());
+  const mod = plan.toCreate.find((f) => f.path === "src/checkout/entrypoints/http/mod.ts");
+  if (!mod) throw new Error("no entrypoint mod.ts generated");
+
+  // Both [ENT]s land in ONE controller (no path collision).
+  assertEquals(
+    plan.toCreate.filter((f) => f.path.startsWith("src/checkout/entrypoints/")).map((f) => f.path)
+      .sort(),
+    ["src/checkout/entrypoints/http/e2e.test.ts", "src/checkout/entrypoints/http/mod.ts"],
+  );
+  assertStringIncludes(mod.content, '@EndpointController("http")');
+  assertStringIncludes(mod.content, "export class HttpController");
+  assertStringIncludes(mod.content, "createOrder(body: NewOrderDto): Promise<OrderDto>");
+  assertStringIncludes(mod.content, "payOrder(body: PayDto): Promise<ReceiptDto>");
+  // order/dependsOn/bind auto-derived from the DTO field graph (PayDto.id <- OrderDto.id).
+  assertStringIncludes(mod.content, "input: NewOrderDto, output: OrderDto, order: 1");
+  assertStringIncludes(
+    mod.content,
+    'output: ReceiptDto, order: 2, dependsOn: ["createOrder"], bind: {"id":"createOrder.id"}',
+  );
+  // Delegates to the (input,output)-matched coordinators.
+  assertStringIncludes(mod.content, "return orderCreate(body)");
+  assertStringIncludes(mod.content, "return paymentPay(body)");
+  assertStringIncludes(mod.content, 'from "@mrg-keystone/keep"');
+  assertStringIncludes(mod.content, 'endpointModule("Checkout", [HttpController])');
 });
 
 Deno.test("planManifest — :core DTO routes to src/core/dto/", () => {

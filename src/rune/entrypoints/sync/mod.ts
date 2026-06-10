@@ -202,6 +202,8 @@ const REQUIRED_IMPORTS: Record<string, string> = {
   "reflect-metadata": "npm:reflect-metadata@^0.2",
   "#std/assert": "jsr:@std/assert",
   "#std/path": "jsr:@std/path",
+  // Generated [ENT] controllers + e2e tests import the keep backend framework.
+  "@mrg-keystone/keep": "jsr:@mrg-keystone/keep@^1",
 };
 
 // Compiler options the generated code needs. class-validator / class-transformer
