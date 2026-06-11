@@ -3,7 +3,7 @@
 # install (current or legacy) may have placed them, so no stale/duplicate copies
 # linger on your PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/uninstall.sh | sh
+#   curl -fsSL https://github.com/mrg-keystone/rune/releases/download/latest/uninstall.sh | sh
 #
 # RUNE_INSTALL — also clean this dir (the install target; default ~/.deno/bin).
 set -u

@@ -5,7 +5,7 @@
 # Installs CLEANLY: it first UNINSTALLS any existing rune (every known location),
 # then installs one fresh copy — so you never accumulate stale/duplicate binaries.
 #
-#   curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh | sh
+#   curl -fsSL https://github.com/mrg-keystone/rune/releases/download/latest/install.sh | sh
 #
 # Local dev build (compile from THIS checkout, skip the GitHub release):
 #   deno task install        (= sh scripts/install.sh --dev)
@@ -13,7 +13,8 @@
 # Options (env vars):
 #   RUNE_INSTALL        install dir (default: ~/.deno/bin)
 #   RUNE_VERSION        tag to install (default: latest release; e.g. develop, v0.1.0)
-#   RUNE_REF            ref to fetch uninstall.sh + the skill from (default: main)
+#   RUNE_REF            fallback ref for uninstall.sh + the skill, used only for
+#                       releases that predate those assets (default: main)
 #   CLAUDE_SKILLS_DIR   Claude Code skills dir (default: ~/.claude/skills)
 #
 # Prerequisite: `deno` on your PATH — the linter's type-aware rules spawn
@@ -27,6 +28,14 @@ RUNE_REF="${RUNE_REF:-main}"
 # (purge / chmod / xattr / codesign) picks it up — no other edit needed.
 BINS="rune rune-lsp rune-syntax"
 SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
+
+# The release tag to install. The rolling release is ALWAYS tagged `latest`;
+# pinned snapshots use their v* tag. Resolve directly — never via the GitHub
+# "latest release" API, which is unreliable mid-deploy (it briefly returns an
+# older pinned tag while `latest` is rebuilding). Resolved up front because the
+# release is the source of truth for every asset below (binaries, uninstall.sh,
+# the skill), so each fetch is version-matched to the tag being installed.
+tag="${RUNE_VERSION:-latest}"
 
 # install_skill <path-to-SKILL.md> — install the rune Claude Code skill into
 # user scope, so the assistant always matches the installed toolchain. Skipped
@@ -53,8 +62,12 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 # --- 1. Uninstall any prior copy first (install = uninstall + fresh install) ---
+# uninstall.sh comes from the release being installed; the repo at $RUNE_REF is
+# only a fallback for releases that predate the standalone asset.
 echo "Removing any existing rune install…"
-if curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/scripts/uninstall.sh" \
+if curl -fsSL "https://github.com/$REPO/releases/download/$tag/uninstall.sh" \
+     -o "$tmp/uninstall.sh" 2>/dev/null ||
+   curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/scripts/uninstall.sh" \
      -o "$tmp/uninstall.sh" 2>/dev/null; then
   RUNE_INSTALL="$BINDIR" sh "$tmp/uninstall.sh" || true
 else
@@ -115,13 +128,7 @@ case "$os-$arch" in
     ;;
 esac
 
-# --- 3. Resolve the release tag ---
-# The rolling release is ALWAYS tagged `latest`; pinned snapshots use their v* tag.
-# Resolve directly — never via the GitHub "latest release" API, which is unreliable
-# mid-deploy (it briefly returns an older pinned tag while `latest` is rebuilding).
-tag="${RUNE_VERSION:-latest}"
-
-# --- 4. Download + install ---
+# --- 3. Download + install (the tag was resolved up top) ---
 url="https://github.com/$REPO/releases/download/$tag/rune-$target.tar.gz"
 echo "Downloading rune $tag ($target)…"
 curl -fSL "$url" -o "$tmp/rune.tar.gz"
@@ -141,11 +148,14 @@ if [ "$os" = "Darwin" ]; then
 fi
 
 # The skill ships inside the release tarball, version-matched to the binaries.
-# Releases that predate that fall back to the repo at $RUNE_REF.
+# Fallbacks for releases that predate that: the release's standalone SKILL.md
+# asset, then the repo at $RUNE_REF.
 if [ -f "$tmp/pkg/SKILL.md" ]; then
   install_skill "$tmp/pkg/SKILL.md"
-elif curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/skills/rune/SKILL.md" \
-     -o "$tmp/SKILL.md" 2>/dev/null; then
+elif curl -fsSL "https://github.com/$REPO/releases/download/$tag/SKILL.md" \
+       -o "$tmp/SKILL.md" 2>/dev/null ||
+     curl -fsSL "https://raw.githubusercontent.com/$REPO/$RUNE_REF/skills/rune/SKILL.md" \
+       -o "$tmp/SKILL.md" 2>/dev/null; then
   install_skill "$tmp/SKILL.md"
 else
   echo "rune: could not fetch the rune skill — binaries installed, skill left as-is." >&2

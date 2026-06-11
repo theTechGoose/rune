@@ -127,3 +127,21 @@ jobs:
             rune-${{ matrix.target }}.tar.gz
             rune-${{ matrix.target }}.tar.gz.sha256
           fail_on_unmatched_files: true
+
+      # Releases are the source of truth for EVERYTHING shipped: the installer,
+      # uninstaller, and skill are standalone assets too, so install.sh and
+      # `rune update` fetch them version-matched from the release instead of a
+      # branch ref. One leg only — parallel uploads of the same asset name race.
+      - name: Publish installer + skill (shared assets)
+        if: runner.os == 'Linux'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          name: ${{ steps.rel.outputs.tag == 'latest' && 'latest (main)' || steps.rel.outputs.tag == 'develop' && 'develop (rolling)' || steps.rel.outputs.tag }}
+          make_latest: ${{ steps.rel.outputs.make_latest }}
+          prerelease: false
+          files: |
+            scripts/install.sh
+            scripts/uninstall.sh
+            skills/rune/SKILL.md
+          fail_on_unmatched_files: true

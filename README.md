@@ -7,7 +7,7 @@ is the source of truth — you regenerate from it, you don't hand-edit the struc
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh | sh
+curl -fsSL https://github.com/mrg-keystone/rune/releases/download/latest/install.sh | sh
 rune --help
 ```
 
@@ -28,7 +28,7 @@ binaries *and* skill. Options:
   integration work, ahead of stable):
 
   ```sh
-  curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh | RUNE_VERSION=develop sh
+  curl -fsSL https://github.com/mrg-keystone/rune/releases/download/develop/install.sh | RUNE_VERSION=develop sh
   ```
 
 Supported targets: Apple-silicon macOS, Intel macOS, Linux x86-64. On macOS the
@@ -37,7 +37,7 @@ script de-quarantines the binaries so Gatekeeper doesn't block them.
 ### Uninstall
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/uninstall.sh | sh
+curl -fsSL https://github.com/mrg-keystone/rune/releases/download/latest/uninstall.sh | sh
 # or, from a checkout: deno task uninstall
 ```
 

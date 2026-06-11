@@ -1,5 +1,5 @@
 import { assertEquals } from "#std/assert";
-import { planUpdate } from "./mod.ts";
+import { installerUrls, planUpdate } from "./mod.ts";
 
 const COMPILED = {
   os: "darwin",
@@ -38,4 +38,18 @@ Deno.test("planUpdate — rejects extra arguments", () => {
 
 Deno.test("planUpdate — rejects Windows", () => {
   assertEquals(typeof planUpdate([], { ...COMPILED, os: "windows" }).error, "string");
+});
+
+Deno.test("installerUrls — the target release's asset first, raw main as fallback", () => {
+  assertEquals(installerUrls("v0.1.0"), [
+    "https://github.com/mrg-keystone/rune/releases/download/v0.1.0/install.sh",
+    "https://raw.githubusercontent.com/mrg-keystone/rune/main/scripts/install.sh",
+  ]);
+});
+
+Deno.test("installerUrls — no tag means the rolling `latest` release", () => {
+  assertEquals(
+    installerUrls()[0],
+    "https://github.com/mrg-keystone/rune/releases/download/latest/install.sh",
+  );
 });
