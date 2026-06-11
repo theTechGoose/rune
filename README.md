@@ -103,7 +103,7 @@ deno task studio
 | Command | Does |
 |---|---|
 | `rune [dir]` | lint a project against the architecture |
-| `rune sync <file.rune>` | generate/update a module from its spec |
+| `rune sync <file.rune>` | generate/update a module from its spec (+ keep bootstrap in `bootstrap/`) |
 | `rune manifest <file.rune>` | one-shot generate (no prune) |
 | `rune validate <keywords.json>` | validate the artifact |
 | `rune lsp` / `rune fmt <file>` | language server / format (Rust helpers) |
