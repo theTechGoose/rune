@@ -2,13 +2,13 @@
 
 > Status: planned, not started. Phase 1 (the keep building blocks) is complete and green in the
 > `keep` package: `@Endpoint`/`@EndpointController`/`endpointModule`, the `x-keep-process` OpenAPI
-> extension, the per-module process emulator at `/docs/<module>`, and the headless
+> extension, the per-module cake at `/docs/<module>`, and the headless
 > `exerciseEndpoints` runner.
 
 ## Goal
 
 Close the loop so the workflow is **write rune → `rune sync` → fill coordinator bodies → serve keep
-→ walk the emulator**. Today `[ENT] surface.action(InDto): OutDto` generates a bare
+→ walk the cake**. Today `[ENT] surface.action(InDto): OutDto` generates a bare
 `export async function action(input): Promise<Output> { throw … }` stub
 (`src/rune/domain/business/rune-manifest/mod.ts`, `ENTRYPOINT_MOD_TPL` ~L901) with no keep wiring,
 no Swagger, no process metadata. Phase 2 generates a real keep controller from the spec.
@@ -144,5 +144,5 @@ already predicted; no new file kinds). `external-imports` (alias import is allow
   - `deno check` passes (requires `@mrg-keystone/keep` resolvable — C4);
   - `rune lint` is clean — watch `layer-restrictions` for the entrypoints→coordinators edge; if it
     flags, add that edge to the rule's allowlist (the one possible extra change);
-  - fill the two coordinator bodies, serve, open `/docs/<m>` → emulator orders create→pay, Emulate
+  - fill the two coordinator bodies, serve, open `/docs/<m>` → cake orders create→pay, Emulate
     chains the id, **Run all** greens; `RUNE_E2E=1 deno test` greens the generated e2e.

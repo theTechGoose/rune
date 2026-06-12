@@ -54,8 +54,13 @@ before you `sync`. The full step-by-step is **The lifecycle** below.
   business features and data adapters (no `sig.ts` — only `[PLY]` variants get an
   abstract base), **class-validator / class-transformer DTOs** (fields typed from
   the `[TYP]`s), and coordinators split into an **imperative shell + a pure
-  `<verb>Core`**. `mod.ts` and test files are *dev-owned* — created once with
-  stubs, never overwritten; everything else regenerates each run.
+  `<verb>Core`**. DTOs, business/adapter impls, coordinators, entrypoint
+  controllers, and tests are all **create-once / dev-owned** — written once with
+  stubs, then **never overwritten** (their header says so). Only the `[PLY]`
+  abstract `sig.ts` contracts and the `mod-root.ts` re-export surface regenerate
+  each sync. To pull a changed signature into a file you've already filled in,
+  `rune sync --regen <file>` writes a `.new` sibling to diff and merge — never
+  clobbering your body.
 - **Every seam is validated.** Generated DTOs carry class-validator constraints
   from `[TYP:modifiers]`, and the generated coordinator `assert`s every seam —
   input, adapter reads/writes, result — via `#assert` (keep's runtime). A failed
@@ -157,7 +162,7 @@ class OrdersController {
 ```
 
 keep serves the route, generates per-module Swagger from the DTO classes, and renders
-the process emulator — all from the decorators. Type the handler param as the input
+the cake — all from the decorators. Type the handler param as the input
 DTO; `@Endpoint` wires the body for you (don't add `@Body()`).
 
 ### Declare process order + dependencies on the endpoint
@@ -178,7 +183,7 @@ create(body: CreateOrderDto) { /* … */ }          // outputs { id }
 pay(body: PayDto) { /* … */ }
 ```
 
-This metadata orders the emulator's bullets and auto-chains `create`'s `id` into
+This metadata orders the cake's bullets and auto-chains `create`'s `id` into
 `pay`'s `orderId` (and drives the headless runner). Treat it as part of the contract,
 like the REQ inventory. **You rarely write it by hand**: `rune sync` derives
 order/dependsOn/bind from the DTO field graph (same-named output→input fields chain
@@ -190,7 +195,7 @@ Not every module is a straight chain. Three spec constructs cover the rest — a
 derived into the `@Endpoint` metadata by `rune sync`:
 
 - **Flows (XOR branches)** — `[ENT:card] http.payCard(PayDto): PaymentDto` puts the
-  endpoint in the named flow; untagged endpoints belong to every flow. The emulator
+  endpoint in the named flow; untagged endpoints belong to every flow. The cake
   gets a flow selector (walks one branch at a time; dependencies on endpoints outside
   the active flow don't gate), and `exerciseEndpoints({ flow: "card" })` does the
   same headlessly. When endpoints in *different* flows produce the same field, the
@@ -199,17 +204,17 @@ derived into the `@Endpoint` metadata by `rune sync`:
   resolvable wins.
 - **External inputs** — `[TYP:ext] memberId: string` marks a value minted outside
   the module. An unproduced input field of that type generates
-  `bind: { memberId: "$memberId" }`: the emulator lists it under **Module inputs**
+  `bind: { memberId: "$memberId" }`: the cake lists it under **Module inputs**
   (shared across all docs pages; its value may reference another module's capture,
   e.g. `{{members:create.memberId}}`), and the runner takes it from
   `overrides.seeds.memberId`.
 - **Optional steps** — `[ENT:optional] http.survey(SurveyDto): ThanksDto` is
-  attempted but not required: its failure doesn't stop the emulator's run-all and
+  attempted but not required: its failure doesn't stop the cake's run-all and
   lands in `report.optionalFailed`, not `report.failed`.
 
 **The stub lifecycle (ghost stubs).** Until a `[TYP:ext]` input's real producer
 exists, `rune sync` generates `bootstrap/stubs.ts` — one trivial GET endpoint per
-unfulfilled input (marked `stub: true`, badged in the emulator, mounted at
+unfulfilled input (marked `stub: true`, badged in the cake, mounted at
 `/docs/stubs`) that mints a placeholder value. The generated `bootstrap/modules.ts`
 excludes it when `DENO_ENV=production`, and the stub **evaporates** on the next sync
 once any module in the project produces the field (the file is deleted entirely when
@@ -224,7 +229,7 @@ output (typing a value still overrides), the headless runner falls back from
 `overrides.seeds` to the producer's capture, and the stub evaporates. No glue code,
 no config — the shared field name *is* the contract.
 
-In the emulator, request bodies hold `{{step.field}}` references resolved at send
+In the cake, request bodies hold `{{step.field}}` references resolved at send
 time (so hand edits are never overwritten); `{{name}}` reads a shared environment
 variable, `{{$name}}` a declared module input, and `{{module:step.field}}` another
 module's captured output.
@@ -393,10 +398,10 @@ This is one repeating cycle — **write → check → generate → fill in → v
    by default (so a spec edit can't silently delete your code). Re-run with
    `--force` to remove them: `rune sync … --force`.
 
-## Verify via the emulator (and headless runner)
+## Verify via the cake (and headless runner)
 
 After `rune sync` + filling bodies + `deno check` + `rune lint`, **serve the app
-(`deno run -A bootstrap/mod.ts` — generated by sync) and open `/docs/<module>`** — keep renders a per-module **process emulator**: the endpoints
+(`deno run -A bootstrap/mod.ts` — generated by sync) and open `/docs/<module>`** — keep renders a per-module **cake**: the endpoints
 as an ordered, bulleted checklist. Click **Emulate process** down the list (or **Run all
 in order**) and read each response; a green checkmark on every step means the rune's
 logic actually works, not just type-checks. Each success captures its output and
@@ -404,12 +409,12 @@ pre-fills the next dependent step (`bind`). Standard Swagger UI is at
 `/docs/<module>/swagger`, the raw spec at `/docs/<module>/json`. **`/docs/_map`**
 shows the whole composed app as one live process graph — module lanes, bind edges
 (dashed for cross-module `$input` contracts), status dots that recolor as you run
-steps anywhere; click a node to land on its emulator step.
+steps anywhere; click a node to land on its cake step.
 
 For the edit loop, prefer **`rune dev`** over re-running serve by hand: it watches
 the project, re-checks/re-syncs the spec on save, restarts the app, and the open
 docs pages reload themselves (spec errors appear in the page banner while the last
-good server keeps serving; emulator session state survives the restart).
+good server keeps serving; cake session state survives the restart).
 
 For CI / unattended runs, call the same thing in code:
 
@@ -448,7 +453,7 @@ server. Re-run after every spec change.
   the Studio); it's the single source of truth.
 - Don't hand-roll routing, request parsing, Swagger, or a dependency/run loop in an
   entrypoint `mod.ts` — decorate a handler with keep's `@Endpoint` (declaring
-  `order`/`dependsOn`/`bind`) and let keep build the emulator + harness.
+  `order`/`dependsOn`/`bind`) and let keep build the cake + harness.
 
 ## Worked examples
 

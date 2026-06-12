@@ -9,7 +9,7 @@
 
 Phase 1 unit tests cover decorators→routes/Swagger (Stage 1), the dependency graph (Stage 2), the
 in-process runner (Stage 5), and Swagger gating (Stage 7). They do **not** cover the headline
-**interactive emulator click-through (Stage 4)**, the **Playwright HTTP path (Stage 6, gated)**, or
+**interactive cake click-through (Stage 4)**, the **Playwright HTTP path (Stage 6, gated)**, or
 **rune generating the controller (Stage 8)**. This plan closes those with a single realistic
 fixture exercised through the real flow.
 
@@ -54,7 +54,7 @@ Commit (hand-written, not generated):
   expected `order`/`dependsOn`/`bind`; `processOrder` returns the cake sequence, `cycles: []`.
 - **5 in-process runner:** `exerciseEndpoints({ api })` → all 6 passed; chained ids flow (a step
   throwing on a missing bound field would fail — proves chaining).
-- **4 interactive emulator (live, Playwright MCP):** open `/docs/cake`; only step 1 enabled; click
+- **4 interactive cake (live, Playwright MCP):** open `/docs/cake`; only step 1 enabled; click
   Emulate → checkmark + response + step 2 unlocks **pre-filled from the captured `storeId`**; walk
   to 6 checkmarks; reload → **Run all** → 6 green. Screenshots as evidence.
 - **4 committed regression:** `keep` browser test (`emulator-ui/browser.test.ts`, gated `KEEP_BROWSER=1`,
@@ -83,7 +83,7 @@ chromium` (or `PLAYWRIGHT_BROWSERS_PATH`). keep tasks `test:browser` (`KEEP_BROW
   must resolve.
 - **`layer-restrictions` lint:** the entrypoints→coordinators import edge must pass `rune lint`; add
   the edge to the rule's allowlist if it flags.
-- **Emulator base-path:** the page derives the app root by stripping `/docs/<module>`; verify
+- **Cake base-path:** the page derives the app root by stripping `/docs/<module>`; verify
   standalone serving (mounted-under-Fresh is out of scope this pass).
 
 ## Exit criteria

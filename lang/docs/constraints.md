@@ -62,6 +62,34 @@ Derived from LSP implementation.
 | `[REQ]` takes no modifier (any `[REQ:x]` is rejected) | ERROR |
 | Double blank line between REQs | WARNING |
 
+## Entrypoints
+
+| Rule | Severity |
+|------|----------|
+| `[ENT]` format: `[ENT] surface.action(InputDto): OutputDto` | ERROR |
+| `[ENT]` input must be a DTO or inline `{}`; output must be a DTO | ERROR |
+| `[ENT]` modifier is a flow name or `optional` (`[ENT:card]`, `[ENT:optional]`) | - |
+| An `[ENT]` may carry ONE indented `[REQ]` body line naming the coordinator it dispatches to | - |
+| An `[ENT]` body `[REQ]` must reference a defined `[REQ]` | ERROR |
+| An `[ENT]` body `[REQ]` takes no modifier | ERROR |
+| Without a body `[REQ]`, an `[ENT]` is matched to its coordinator by `(input, output)` DTO pair | - |
+| Two `[REQ]`s sharing an `[ENT]`'s `(input, output)` signature are ambiguous — disambiguate with a body `[REQ]` | ERROR |
+
+An empty input (`[ENT] http.refresh({}): StatusDto`) generates a no-argument
+handler: the `@Endpoint` omits its `input` key and the method takes no body.
+
+## Process derivation
+
+The cake/runner order and the `dependsOn` / `bind` wiring are derived from the
+DTO field graph across the module's `[ENT]`s.
+
+| Rule | Note |
+|------|------|
+| An ent depends on the earliest-declared ent whose **output** mints a field its **input** consumes | earliest-producer-wins |
+| **Outputs declare what an ent MINTS, not what it echoes** — a field present in both an ent's input and output is NOT a producer of that field | echo-fields would otherwise poison derivation |
+| A producer edge that would close a **cycle** (`A↔B`) is dropped; that field falls back to a `$input` bind | no circular `dependsOn` is ever emitted |
+| A consumed field with no producer and a `[TYP:ext]` type becomes a `$field` external-input bind | seeds / the Module-inputs card supply it |
+
 ## Signatures
 
 | Rule | Severity |

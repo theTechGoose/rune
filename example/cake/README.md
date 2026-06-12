@@ -1,8 +1,8 @@
-# cake — the keep process-emulator example
+# cake — the keep cake example
 
 A six-step process (`drive → shop → checkout → mix → bake → cut`) that demonstrates the
 rune → keep flow end to end: write a spec, `rune sync` it into keep endpoint controllers, fill the
-coordinator bodies, serve, and walk the per-module **process emulator** at `/docs/cake`.
+coordinator bodies, serve, and walk the per-module **cake** at `/docs/cake`.
 
 The DTO field names chain on purpose — each step's input field matches the prior step's output
 field — so `rune sync` **auto-derives** the `order` / `dependsOn` / `bind` on each `@Endpoint`:
@@ -24,7 +24,7 @@ rune sync src/cake/cake.rune
 
 # 2. fill the six coordinator bodies (the generated <verb>Core functions)
 
-# 3. serve and verify — open /docs/cake, walk the emulator (Emulate down the list,
+# 3. serve and verify — open /docs/cake, walk the cake (Emulate down the list,
 #    or Run all). Each green checkmark = that endpoint's logic works; the next step
 #    unlocks pre-filled from the captured output. Standard Swagger UI is at
 #    /docs/cake/swagger, the raw spec at /docs/cake/json.

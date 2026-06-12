@@ -1,6 +1,6 @@
 # Branch: `phase2-keep-integration` — generate keep endpoint controllers from `[ENT]`
 
-Companion to `mrg-keystone/keep` branch `phase2-test` (the building blocks + emulator + harness the
+Companion to `mrg-keystone/keep` branch `phase2-test` (the building blocks + cake + harness the
 generated controllers plug into). This branch is the **rune** half: codegen, the skill, the example,
 the verification-harness repair, and planning docs.
 
@@ -17,7 +17,7 @@ the verification-harness repair, and planning docs.
 - **Import map (`src/rune/entrypoints/sync/mod.ts`).** `rune sync` writes `@mrg-keystone/keep` into
   the generated project's `deno.json`.
 - **Skill (`skills/rune/SKILL.md`).** Teaches the `[ENT]`→keep wiring, the `order`/`dependsOn`/`bind`
-  contract, and the "verify via the emulator / headless runner" loop.
+  contract, and the "verify via the cake / headless runner" loop.
 - **Example (`example/cake/`).** A six-step chained spec (`drive → shop → checkout → mix → bake →
   cut`) whose DTO field names chain so sync auto-derives the full process metadata.
 - **Verification-harness repair (`scripts/verify.ts`).** The verify script still pointed at the
@@ -39,7 +39,7 @@ End-to-end (against a local keep checkout):
 
 ```sh
 rune sync example/cake/src/cake/cake.rune   # inspect the generated @EndpointController + computed
-                                            # order/dependsOn/bind; then drive it with keep's emulator
+                                            # order/dependsOn/bind; then drive it with keep's cake
 ```
 
 The full spec→sync→serve→emulate acceptance lives, runnable, in the keep PR (`e2e/cake`,

@@ -453,9 +453,16 @@ decorator, and the generated coordinator asserts them at every seam.
 
 ### Process flows (branches)
 
-The module's endpoints form a *process* (the emulator walks them in order, chaining
+The module's endpoints form a *process* (the cake walks them in order, chaining
 outputs into inputs — metadata derived from the DTO field graph). A bracket modifier
 names the **flow** an endpoint belongs to, expressing a branch:
+
+> **Outputs declare what an endpoint *mints*, not what it *echoes*.** A field that
+> appears in both an endpoint's input and output DTO is not treated as produced by
+> it — only genuinely-minted outputs feed another endpoint's input. (Echo-fields
+> would otherwise derive bogus producers and circular `dependsOn`.) When two
+> endpoints would each produce a field the other consumes, the cycle is broken and
+> the later one's field falls back to a `$input` bind.
 
 ```
 [ENT] http.start(StartDto): TicketDto
@@ -466,19 +473,19 @@ names the **flow** an endpoint belongs to, expressing a branch:
 ```
 
 - `[ENT:card]` / `[ENT:cash]` — the endpoint exists only in that named flow. Untagged
-  endpoints are part of every flow. The emulator shows a flow selector and walks one
+  endpoints are part of every flow. The cake shows a flow selector and walks one
   branch at a time; `exerciseEndpoints({ flow })` does the same headlessly.
 - When the same field is produced by endpoints in **different** flows (here
   `paymentId`), the consumer (`fulfill`) is generated depending on all of them with
   the alternatives bound first-resolvable-wins — the join after the branch.
 - `[ENT:optional]` (reserved) — the step is attempted but not required: its failure
-  doesn't stop the emulator's run-all or fail the harness report.
+  doesn't stop the cake's run-all or fail the harness report.
 
 ### External inputs
 
 `[TYP:ext]` marks a value as produced **outside this module** (another module's
 endpoint, a human). An input field of that type which no endpoint in the module
-produces is generated as a `$name` external-input bind — the emulator lists it under
+produces is generated as a `$name` external-input bind — the cake lists it under
 "module inputs" (set once, shared across docs pages; it can reference another
 module's capture, e.g. `{{members:create.memberId}}`), and the headless runner takes
 it from `overrides.seeds`:
@@ -494,7 +501,7 @@ An external input is a promise that *someone else* produces the value. Until tha
 producer exists, `rune sync` keeps the project runnable by generating
 `bootstrap/stubs.ts` — a **ghost stub module** with one trivial GET endpoint per
 unfulfilled `[TYP:ext]` input (`mint-<name>`, marked `stub: true`), each minting a
-placeholder value of the declared primitive. It mounts like any module (emulator at
+placeholder value of the declared primitive. It mounts like any module (cake at
 `/docs/stubs`, badged `stub`), so dependent modules run end-to-end before their real
 producers are built — the consumer's `$name` input auto-resolves from the stub's
 capture.
@@ -511,19 +518,19 @@ capture.
 
 ### `rune dev` (the live loop)
 
-`rune dev [path]` runs the spec→emulator loop unattended: it boots the project's app
+`rune dev [path]` runs the spec→cake loop unattended: it boots the project's app
 (`deno run -A bootstrap/mod.ts`) under `KEEP_DEV=<status file>` and watches `src/`,
 `specs/`, `bootstrap/`, and `deno.json` (never the bare root; sync's own writes are
 muted so the loop can't feed on itself). On save:
 
 - **spec changed** → `rune check` first. Errors are published to the status file
-  **only** — keep's `/docs/_dev` serves them and the open emulator pages show them in
+  **only** — keep's `/docs/_dev` serves them and the open cake pages show them in
   a red banner while the **last good server keeps serving**. A clean check runs
   `rune sync` and restarts the app.
 - **source changed** → restart only (no sync).
 
-Each restart mints a new `bootId`; the emulator/map pages poll `/docs/_dev` and
-reload themselves when it changes. Emulator session state (statuses, captures,
+Each restart mints a new `bootId`; the cake/map pages poll `/docs/_dev` and
+reload themselves when it changes. Cake session state (statuses, captures,
 edited bodies, module inputs) lives in `localStorage`, so it **survives every
 restart and reload** — fix a spec, save, and re-run the failed step where you left
 off.
