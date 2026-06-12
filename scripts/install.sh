@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # Install the rune CLI (rune + rune-lsp + rune-syntax) from GitHub Releases,
-# plus the rune Claude Code skill into user scope (~/.claude/skills/rune).
+# plus the rune Claude Code skill into user scope (~/.claude/skills/rune), and
+# refresh the coupled keep skill (~/.claude/skills/keep) alongside it.
 #
 # Installs CLEANLY: it first UNINSTALLS any existing rune (every known location),
 # then installs one fresh copy — so you never accumulate stale/duplicate binaries.
@@ -52,6 +53,22 @@ install_skill() {
   mkdir -p "$SKILLS_DIR/rune"
   cp "$1" "$SKILLS_DIR/rune/SKILL.md"
   echo "Installed the rune skill -> $SKILLS_DIR/rune/SKILL.md"
+}
+
+# install_keep_skill — rune and keep ship as a coupled pair, so refresh the keep
+# skill (always keep's rolling `latest`) alongside rune's, into the same skills
+# dir. Best-effort: a keep-release hiccup must NOT fail the rune install; no-op
+# without Claude Code. ($tmp is set below, before this is ever called.)
+install_keep_skill() {
+  [ -d "$HOME/.claude" ] || return 0
+  echo "Refreshing the coupled keep skill…"
+  if curl -fsSL "https://github.com/mrg-keystone/keep/releases/download/latest/install.sh" \
+       -o "$tmp/keep-install.sh" 2>/dev/null; then
+    CLAUDE_SKILLS_DIR="$SKILLS_DIR" sh "$tmp/keep-install.sh" \
+      || echo "rune: keep skill not refreshed (rune itself is installed)." >&2
+  else
+    echo "rune: could not fetch the keep installer (rune itself is installed)." >&2
+  fi
 }
 
 # --dev: build + install from this local checkout instead of a GitHub release.
@@ -109,6 +126,7 @@ if [ "$DEV" = "1" ]; then
     for b in $BINS; do codesign -f -s - "$BINDIR/$b" 2>/dev/null || true; done
   fi
   install_skill "$repo/skills/rune/SKILL.md"
+  install_keep_skill
   echo "Installed rune (dev build from $repo) -> $BINDIR"
   command -v deno >/dev/null 2>&1 && echo "Run: rune --help"
   exit 0
@@ -160,6 +178,8 @@ elif curl -fsSL "https://github.com/$REPO/releases/download/$tag/SKILL.md" \
 else
   echo "rune: could not fetch the rune skill — binaries installed, skill left as-is." >&2
 fi
+
+install_keep_skill
 
 echo "Installed rune $tag -> $BINDIR"
 case ":$PATH:" in
