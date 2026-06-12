@@ -208,7 +208,7 @@ Deno.test("parse — unknown [TYP] modifier message is byte-exact", () => {
   assertEquals(ast.errors.length, 1);
   assertEquals(
     ast.errors[0].message,
-    '[TYP] unknown modifier "bogus" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)',
+    '[TYP] unknown modifier "bogus" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)',
   );
   // The typ itself still parses; the invalid modifier is dropped.
   assertEquals(ast.typs[0].modifiers, []);

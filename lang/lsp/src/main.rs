@@ -662,25 +662,35 @@ fn validate_typ_modifiers(raw: &str, name: &str, declared_type: &str) -> Vec<Str
             Some((i, v)) => (i, Some(v)),
             None => (item, None),
         };
-        // Required base type per modifier; None = ext/core (no base requirement).
+        // Required base type per modifier; None = ext/core/example (no base requirement).
         let base: Option<&str> = match id {
-            "ext" | "core" => None,
+            "ext" | "core" | "example" => None,
             "uuid" | "email" | "url" | "nonempty" => Some("string"),
             "int" | "min" | "max" | "positive" => Some("number"),
             _ => {
                 errors.push(format!(
-                    "[TYP] unknown modifier \"{}\" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)",
+                    "[TYP] unknown modifier \"{}\" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)",
                     id
                 ));
                 continue;
             }
         };
         let takes_value = id == "min" || id == "max";
+        let takes_text = id == "example";
         if takes_value {
             let numeric = value.map(is_plain_decimal).unwrap_or(false);
             if !numeric {
                 errors.push(format!(
                     "[TYP] modifier \"{}\" requires a numeric value (e.g. min=0)",
+                    id
+                ));
+                continue;
+            }
+        } else if takes_text {
+            // Free-text value, mirrors the TS engine: required and non-empty.
+            if value.map_or(true, |v| v.is_empty()) {
+                errors.push(format!(
+                    "[TYP] modifier \"{}\" requires a value (e.g. example=orders)",
                     id
                 ));
                 continue;
@@ -1308,13 +1318,27 @@ mod tests {
         assert!(validate_typ_modifiers("core", "id", "string").is_empty());
         assert!(validate_typ_modifiers("int", "count", "number").is_empty());
         assert!(validate_typ_modifiers("positive", "amount", "number").is_empty());
+        assert!(validate_typ_modifiers("example=orders", "tableName", "string").is_empty());
+        assert!(validate_typ_modifiers("ext,example=42", "qty", "number").is_empty());
     }
 
     #[test]
     fn typ_modifier_unknown() {
         assert_eq!(
             validate_typ_modifiers("bogus", "id", "string"),
-            vec!["[TYP] unknown modifier \"bogus\" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)".to_string()]
+            vec!["[TYP] unknown modifier \"bogus\" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)".to_string()]
+        );
+    }
+
+    #[test]
+    fn typ_modifier_example_needs_value() {
+        assert_eq!(
+            validate_typ_modifiers("example", "tableName", "string"),
+            vec!["[TYP] modifier \"example\" requires a value (e.g. example=orders)".to_string()]
+        );
+        assert_eq!(
+            validate_typ_modifiers("example=", "tableName", "string"),
+            vec!["[TYP] modifier \"example\" requires a value (e.g. example=orders)".to_string()]
         );
     }
 
@@ -1371,7 +1395,7 @@ mod tests {
         assert!(validate_typ_modifiers("min=1.25", "qty", "number").is_empty());
         assert_eq!(
             validate_typ_modifiers("min = 5", "qty", "number"),
-            vec!["[TYP] unknown modifier \"min \" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)".to_string()]
+            vec!["[TYP] unknown modifier \"min \" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)".to_string()]
         );
     }
 }

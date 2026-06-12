@@ -510,6 +510,16 @@ function tsFor(typeName: string | undefined): { ts: string; dec: string | null }
   }
 }
 
+// The example modifier's value as a typed TS literal: numeric for number
+// types, true/false for booleans, a quoted string otherwise.
+function exampleLiteral(value: string, typeName: string | undefined): string {
+  if (typeName === "number" && /^-?\d+(\.\d+)?$/.test(value)) return value;
+  if (typeName === "boolean" && (value === "true" || value === "false")) {
+    return value;
+  }
+  return JSON.stringify(value);
+}
+
 // Resolve a [DTO] property's base name to a nested DTO class, mirroring the
 // parser's resolution (rune-parse): the name IS a DTO verbatim, the
 // `pascal(name)+"Dto"` convention names one, or its [TYP] aliases one.
@@ -545,6 +555,7 @@ function renderDto(
   const validators = new Set<string>();
   const nestedImports = new Set<string>();
   let hasNested = false;
+  let hasExample = false;
   const fields = dto.properties.map((raw) => {
     // A property may carry the documented modifiers: `(s)` (array of the base
     // type, property name pluralized — `taskId(s)` -> `taskIds: taskId[]`) and
@@ -601,6 +612,17 @@ function renderDto(
       const eq = mod.indexOf("=");
       const id = eq === -1 ? mod : mod.slice(0, eq);
       const value = eq === -1 ? null : mod.slice(eq + 1);
+      // example=<v> → @ApiProperty({ example }): keep's runner and cake fill
+      // required, unbound input fields from the schema's non-empty example, so
+      // a field nothing produces stops being a guaranteed 422 in the walk.
+      if (id === "example" && value !== null && value !== "") {
+        hasExample = true;
+        const lit = exampleLiteral(value, typ?.typeName);
+        decorators.unshift(
+          `@ApiProperty({ example: ${array ? `[${lit}]` : lit} })`,
+        );
+        continue;
+      }
       const spec = TYP_MODIFIERS.get(id);
       if (!spec?.decorator) continue; // ext/core — placement, not validation
       if (id === "int") baseDec = null;
@@ -638,6 +660,9 @@ function renderDto(
     lines.push(
       `import { ${[...validators].sort().join(", ")} } from "class-validator";`,
     );
+  }
+  if (hasExample) {
+    lines.push(`import { ApiProperty } from "#api-doc";`);
   }
   for (const n of [...nestedImports].sort()) {
     const file = transformName(n, types.nameBinding);
@@ -1021,8 +1046,16 @@ function computeEntProcess(
         // No acyclic producer. If some producer exists but every one would cycle, fall back to a
         // `$field` external-input bind (the field is supplied by seeds / the Module-inputs card)
         // rather than emitting a circular dependsOn; otherwise honor an explicit `ext` type.
+        // The plural convention (keep's composition contract): `$name` also resolves at run
+        // time from the first element of a captured `name + "s"` collection output, so a
+        // plural producer makes the field wireable — the list→item gap auto-closes.
         const cyclicOnly = ents.some((p) => p !== ent && minted(p).has(field));
-        if (externalTypes.has(field) || cyclicOnly) bind[field] = `$${field}`;
+        const pluralProducer = ents.some((p) =>
+          p !== ent && minted(p).has(`${field}s`)
+        );
+        if (externalTypes.has(field) || cyclicOnly || pluralProducer) {
+          bind[field] = `$${field}`;
+        }
         continue;
       }
       const flows = new Set(producers.map(entFlow).filter((f) => f !== null));

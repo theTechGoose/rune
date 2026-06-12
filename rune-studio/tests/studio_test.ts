@@ -160,7 +160,7 @@ Deno.test("lint: typ-modifier validates constraint modifiers with exact messages
   const messages = hits.map((d) => d.message);
   assert(
     messages.includes(
-      '[TYP] unknown modifier "fancy" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)',
+      '[TYP] unknown modifier "fancy" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)',
     ),
     "unknown modifier flagged",
   );

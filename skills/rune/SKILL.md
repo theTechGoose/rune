@@ -26,7 +26,8 @@ with `deno run -A src/bootstrap/mod.ts <cmd>`):
 
 ```text
 rune check <file.rune>     # IS THIS RUNE GOOD? validate the spec — no codegen. exit 0 = clean, 2 = errors
-rune sync  <file.rune>     # generate/update the module from the spec (also writes the project's deno.json)
+rune sync  <file.rune>     # generate/update the module from the spec (also writes the project's deno.json),
+                           #   then RUNS the composed app's walk and prints the run-all verdict (--no-run skips)
 rune lint  [dir] [--strict]# lint the generated project against the architecture (default: .) — "All clear" = ok; --strict = CI profile (fails on un-enriched heal-rules)
 rune dev   [path]          # live loop: watch the project — save spec → check → sync → app restart → page reload
 rune manifest <file.rune>  # one-shot generate (no prune)
@@ -243,6 +244,15 @@ output (typing a value still overrides), the headless runner falls back from
 `overrides.seeds` to the producer's capture, and the stub evaporates. No glue code,
 no config — the shared field name *is* the contract.
 
+**The plural convention (list→item).** The composition contract also matches
+collections: `$name` resolves from an exact `name` output **or** the first
+element of a `name + "s"` collection output (`$tableName` ←
+`discover.tableNames[0]`). rune derives the `$name` bind whenever a plural
+producer exists, and a plural producer anywhere in the project evaporates the
+stub. **Name collection fields `<singular>(s)`** — an output called `tables`
+does NOT feed `$tableName`; `rune sync` flags such near-misses in its
+`inputs:` diagnostics.
+
 **Heal-rules (the cake's self-healer).** When a project's endpoints declare
 fault slugs (the lowercase-hyphenated names indented under boundary steps),
 `rune sync` also emits a starter **`fixtures/heal-rules.json`** — keep's cake
@@ -310,6 +320,15 @@ decorators on every generated DTO field of that type:
 | `min=N`    | `number` | `@Min(N)`                                  |
 | `max=N`    | `number` | `@Max(N)`                                  |
 | `positive` | `number` | `@IsPositive()`                            |
+| `example=V`| any      | `@ApiProperty({ example: V })` — swagger    |
+
+`example=<value>` is not a validator: it emits the swagger example keep's
+runner and cake **fill required, unbound input fields from**. A required field
+with no producer, no bind, and no example is a guaranteed 422 in any headless
+walk — `rune sync` warns about exactly those fields. The value runs to the
+next comma/`]` (no commas inside); it's typed by the declared primitive
+(`[TYP:example=3,min=1] qty: number` → `example: 3`). Composes with ext:
+`[TYP:ext,example=orders]`.
 
 `(s)` array properties get the `{ each: true }` decorator forms. Only
 `min`/`max` take a value (`min=0`, numeric). String constraints need a
@@ -420,6 +439,15 @@ This is one repeating cycle — **write → check → generate → fill in → v
    with `deno run -A bootstrap/mod.ts` — no hand-written bootstrapping needed.
    When endpoints declare fault slugs it also scaffolds **`fixtures/heal-rules.json`**
    (MERGE-OWNED — new slugs added, your edits kept; see *Heal-rules* above).
+   Finally sync **executes the composed app's walk** (keep's `exerciseEndpoints`,
+   in-process, in a subprocess) and prints the **run-all verdict** as the last
+   block: green (`N/N steps passed`) means the app actually runs; red names
+   every failed step with its status + message (and whether a heal rule
+   covers it). **A red verdict means the module is not done** — fix the
+   spec/bindings/bodies until it's green, or enrich heal-rules where the
+   failure is environmental. `--no-run` skips the gate; `inputs:` warnings
+   above the verdict name the unproducible/unfillable fields that cause most
+   red walks. A fresh scaffold is red by design (the bodies throw).
 3. **Fill in the bodies.** Generated files:
    - business features & data adapters → **plain concrete classes** (`mod.ts`),
      stubbed with `throw new Error("not implemented")`, plus **one test stub per
@@ -441,7 +469,10 @@ This is one repeating cycle — **write → check → generate → fill in → v
    You implement the stubs; `rune sync` never overwrites them. *Caveat:* because
    `mod.ts` is create-once, changing a spec's methods does NOT auto-update an
    existing `mod.ts` — reconcile by hand, or delete the file and re-sync for a fresh
-   stub.
+   stub. The same applies to `entrypoints/<surface>/mod.ts`: spec changes that
+   alter the derived `order`/`dependsOn`/`bind` (e.g. flipping a [TYP] to ext)
+   do NOT update an existing controller — delete it and re-sync for fresh
+   binds (a stale controller is a classic cause of a red run-all verdict).
    - **heal-rules** → if sync emitted/updated `fixtures/heal-rules.json`, enrich
      every `todo: true` entry it named (see **Heal-rules** above) — concrete
      suggestion + real `why`, then drop the flag. This is dev work like filling a

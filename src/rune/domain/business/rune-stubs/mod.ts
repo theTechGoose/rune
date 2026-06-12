@@ -62,9 +62,127 @@ export function planStubs(
     }
   }
   return [...wanted]
-    .filter(([name]) => !producedAnywhere.has(name))
+    // The plural convention: keep resolves `$name` from an exact `name` output
+    // OR the first element of a `name + "s"` collection output — either one
+    // anywhere in the project fulfills the contract, so the ghost evaporates.
+    .filter(([name]) =>
+      !producedAnywhere.has(name) && !producedAnywhere.has(`${name}s`)
+    )
     .map(([name, tsType]) => ({ name, tsType }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Composition diagnostics for every ent input field across the project —
+ * printed by `rune sync` so a building session sees, at generation time, the
+ * two failure shapes that make a headless walk red:
+ *
+ * - a `$name` module input with NO producer (exact `name` or plural `name+"s"`
+ *   per keep's composition contract) anywhere in the project — the ghost stub
+ *   is the only source, and naming near-misses are called out (a `tables` vs
+ *   `tableNames` mismatch silently fails the convention);
+ * - a required field with no bind, no producer, and no non-empty
+ *   `[TYP:example=…]` — a guaranteed 422 in any headless walk.
+ */
+export function planInputDiagnostics(
+  specs: { path: string; text: string }[],
+): string[] {
+  const notes: string[] = [];
+  interface Mod {
+    name: string;
+    ents: ReturnType<typeof parse>["ents"];
+    dtoByName: Map<string, ReturnType<typeof parse>["dtos"][number]>;
+    externalTypes: Set<string>;
+    exampleOf: Map<string, string>;
+  }
+  const mods: Mod[] = [];
+  const producedAnywhere = new Set<string>();
+  for (const spec of specs) {
+    const ast = parse(spec.text);
+    if (ast.errors.length > 0) continue;
+    const dtoByName = new Map(ast.dtos.map((d) => [d.name, d]));
+    const exampleOf = new Map<string, string>();
+    for (const t of ast.typs) {
+      const ex = t.modifiers.find((m) => m.startsWith("example="));
+      const v = ex?.slice("example=".length);
+      if (v) exampleOf.set(t.name, v);
+    }
+    const m: Mod = {
+      name: ast.module ?? spec.path,
+      ents: ast.ents,
+      dtoByName,
+      externalTypes: new Set(
+        ast.typs.filter((t) => t.isExternal).map((t) => t.name),
+      ),
+      exampleOf,
+    };
+    mods.push(m);
+    for (const ent of ast.ents) {
+      const out = dtoByName.get(ent.output);
+      if (out) for (const f of dtoFieldNames(out)) producedAnywhere.add(f);
+    }
+  }
+
+  const nearMisses = (field: string): string[] => {
+    const lower = field.toLowerCase();
+    return [...producedAnywhere]
+      .filter((f) =>
+        f !== field && f !== `${field}s` &&
+        (f.toLowerCase().includes(lower) || lower.includes(f.toLowerCase()))
+      )
+      .sort()
+      .slice(0, 3);
+  };
+
+  for (const m of mods) {
+    const outputFields = (out: string): string[] => {
+      const dto = m.dtoByName.get(out);
+      return dto ? dtoFieldNames(dto) : [];
+    };
+    for (const ent of m.ents) {
+      const inDto = m.dtoByName.get(ent.input);
+      if (!inDto) continue;
+      for (const field of dtoFieldNames(inDto)) {
+        // Mirror computeEntProcess: exact producer in-module → wired by bind.
+        const produced = m.ents.some(
+          (p) => p !== ent && outputFields(p.output).includes(field),
+        );
+        if (produced) continue;
+        const pluralInModule = m.ents.some(
+          (p) => p !== ent && outputFields(p.output).includes(`${field}s`),
+        );
+        const isDollar = m.externalTypes.has(field) || pluralInModule;
+        if (isDollar) {
+          // `$field` — resolvable per keep's contract from an exact or plural
+          // producer anywhere in the composed app; stubs are the last resort.
+          if (
+            !producedAnywhere.has(field) && !producedAnywhere.has(`${field}s`)
+          ) {
+            const near = nearMisses(field);
+            notes.push(
+              `inputs: $${field} (${m.name}:${ent.action}) has no producer — ` +
+                `nothing outputs "${field}" or "${field}s"; a ghost stub will mint it in dev` +
+                (near.length
+                  ? `. Near-miss outputs that don't match the plural convention: ${
+                    near.join(", ")
+                  }`
+                  : ""),
+            );
+          }
+        } else if (!m.exampleOf.get(field)) {
+          // Unwired and unfillable: keep's runner/cake fill required fields
+          // from the schema's non-empty example — without one this is a
+          // guaranteed 422 in any headless walk.
+          notes.push(
+            `inputs: field "${field}" of ${m.name}:${ent.action} has no producer, ` +
+              `no bind, and no example — add [TYP:example=…] ${field} or wire a ` +
+              `producer (guaranteed 422 in any headless walk)`,
+          );
+        }
+      }
+    }
+  }
+  return notes;
 }
 
 // camelCase/kebab/snake → PascalCase ("memberId" → "MemberId", "member-id" → "MemberId").

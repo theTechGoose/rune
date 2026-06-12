@@ -10,6 +10,9 @@ export interface TypModifierSpec {
   base: "string" | "number" | null;
   /** Whether the modifier takes a numeric value (min=N / max=N). */
   takesValue: boolean;
+  /** Whether the modifier takes a free-text value (example=orders). The value
+   * runs to the next comma/`]`, so it cannot itself contain a comma. */
+  takesText: boolean;
   /** class-validator import name, or null when nothing is emitted. */
   decorator: string | null;
   /** Decorator call for a scalar field, e.g. "@IsUUID()" / "@Min(0)". */
@@ -25,8 +28,9 @@ function entry(
   decorator: string | null,
   call: (value: string | null) => string,
   eachCall: (value: string | null) => string,
+  takesText = false,
 ): [string, TypModifierSpec] {
-  return [id, { id, base, takesValue, decorator, call, eachCall }];
+  return [id, { id, base, takesValue, takesText, decorator, call, eachCall }];
 }
 
 export const TYP_MODIFIERS: ReadonlyMap<string, TypModifierSpec> = new Map([
@@ -96,10 +100,15 @@ export const TYP_MODIFIERS: ReadonlyMap<string, TypModifierSpec> = new Map([
     () => "@IsPositive()",
     () => "@IsPositive({ each: true })",
   ),
+  // example=<value> — a real sample value for the field, emitted as
+  // @ApiProperty({ example }) so keep's runner/cake fill required, unbound
+  // inputs from it instead of 422ing in any headless walk. No base
+  // requirement (the literal is typed by the declared primitive at codegen).
+  entry("example", null, false, null, () => "", () => "", true),
 ]);
 
 const ALLOWED =
-  "(allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)";
+  "(allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)";
 
 const NUMERIC = /^-?\d+(\.\d+)?$/;
 
@@ -135,6 +144,13 @@ export function parseTypModifiers(raw: string | null): {
       if (value === null || !NUMERIC.test(value)) {
         errors.push(
           `[TYP] modifier "${id}" requires a numeric value (e.g. min=0)`,
+        );
+        continue;
+      }
+    } else if (spec.takesText) {
+      if (value === null || value === "") {
+        errors.push(
+          `[TYP] modifier "${id}" requires a value (e.g. example=orders)`,
         );
         continue;
       }

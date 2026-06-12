@@ -1119,3 +1119,66 @@ Deno.test("artifactToOptions — maps bindings, templates, and policies", () => 
   });
   assertEquals(!!opts.bindings?.["<name>"], true);
 });
+
+Deno.test("planManifest — a plural producer turns the singular consumer into a $bind (list→item)", () => {
+  const rune = `[MOD] metadata
+
+[ENT] http.discover(DiscoverDto): CatalogDto
+[ENT] http.enableRead(EnableDto): TableDto
+
+[DTO] DiscoverDto: realm
+    where to look
+[DTO] CatalogDto: tableName(s)
+    every discovered table
+[DTO] EnableDto: tableName
+    the table to track
+[DTO] TableDto: trackedId
+    the tracked table
+
+[TYP] realm: string
+    x
+[TYP] tableName: string
+    x
+[TYP] trackedId: string
+    x`;
+  const plan = planManifest("specs/metadata.rune", rune, new Set());
+  const mod = plan.toCreate.find((f) => f.path === "src/metadata/entrypoints/http/mod.ts");
+  if (!mod) throw new Error("no entrypoint mod.ts generated");
+
+  // discover outputs tableNames (plural); enableRead consumes tableName (singular).
+  // keep's contract resolves $tableName from tableNames[0] — so the consumer gets
+  // a $tableName bind instead of staying unwired (the list→item gap).
+  assertStringIncludes(mod.content, 'bind: {"tableName":"$tableName"}');
+});
+
+Deno.test("planManifest — [TYP:example=…] emits @ApiProperty({ example }) on the DTO field", () => {
+  const rune = `[MOD] shop
+
+[ENT] http.order(OrderDto): TicketDto
+
+[REQ] order.place(OrderDto): TicketDto
+    [NEW] ticket
+    ticket.toDto(): TicketDto
+
+[DTO] OrderDto: item, qty
+    what to buy
+[DTO] TicketDto: ticketId
+    the opened ticket
+
+[TYP:example=widget] item: string
+    a thing to buy
+[TYP:example=3,min=1] qty: number
+    how many
+[TYP] ticketId: string
+    x`;
+  const plan = planManifest("specs/shop.rune", rune, new Set());
+  const dto = plan.toCreate.find((f) => f.path === "src/shop/dto/order.ts");
+  if (!dto) throw new Error("no order.ts DTO generated");
+
+  // string example is quoted; number example is a numeric literal; the swagger
+  // decorator import rides on the #api-doc alias.
+  assertStringIncludes(dto.content, '@ApiProperty({ example: "widget" })');
+  assertStringIncludes(dto.content, "@ApiProperty({ example: 3 })");
+  assertStringIncludes(dto.content, "@Min(1)");
+  assertStringIncludes(dto.content, 'import { ApiProperty } from "#api-doc";');
+});

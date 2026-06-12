@@ -10,12 +10,29 @@ Deno.test("parseTypModifiers — null raw yields empty result", () => {
 
 Deno.test("parseTypModifiers — every table id parses without error", () => {
   for (const [id, spec] of TYP_MODIFIERS) {
-    const item = spec.takesValue ? `${id}=0` : id;
+    const item = spec.takesValue || spec.takesText ? `${id}=0` : id;
     const r = parseTypModifiers(item);
     assertEquals(r.errors, [], `modifier "${item}" should parse`);
     assertEquals(r.mods, [item]);
-    assertEquals(r.values.get(id), spec.takesValue ? "0" : null);
+    assertEquals(
+      r.values.get(id),
+      spec.takesValue || spec.takesText ? "0" : null,
+    );
     assertEquals(r.values.has(id), true);
+  }
+});
+
+Deno.test("parseTypModifiers — example takes free text, requires a value", () => {
+  const ok = parseTypModifiers("ext,example=orders");
+  assertEquals(ok.errors, []);
+  assertEquals(ok.mods, ["ext", "example=orders"]);
+  assertEquals(ok.values.get("example"), "orders");
+
+  for (const bad of ["example", "example="]) {
+    const r = parseTypModifiers(bad);
+    assertEquals(r.errors, [
+      '[TYP] modifier "example" requires a value (e.g. example=orders)',
+    ]);
   }
 });
 
@@ -31,7 +48,7 @@ Deno.test("parseTypModifiers — unknown modifier error is byte-exact", () => {
   const r = parseTypModifiers("bogus");
   assertEquals(r.mods, []);
   assertEquals(r.errors, [
-    '[TYP] unknown modifier "bogus" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)',
+    '[TYP] unknown modifier "bogus" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)',
   ]);
 });
 

@@ -806,6 +806,19 @@
       "param": "none",
       "syntax": "[TYP:positive]",
       "description": "Constrains a number [TYP] to be positive (class-validator @IsPositive)."
+    },
+    {
+      "id": "example",
+      "token": ":example",
+      "label": "Example",
+      "appliesTo": [
+        "typ"
+      ],
+      "kind": "constraint",
+      "decorator": "ApiProperty",
+      "param": "text",
+      "syntax": "[TYP:example=orders]",
+      "description": "A real sample value for the field, emitted as @ApiProperty({ example }) — keep's runner and cake fill required, unbound input fields from it so headless walks don't 422. The value runs to the next comma/], so it cannot contain a comma. Composes: [TYP:ext,example=orders]."
     }
   ],
   "bindings": {

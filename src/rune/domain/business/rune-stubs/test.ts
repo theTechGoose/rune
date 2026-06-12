@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "#std/assert";
-import { planStubs, renderStubsModule } from "./mod.ts";
+import { planInputDiagnostics, planStubs, renderStubsModule } from "./mod.ts";
 
 // A module whose ENT consumes an ext field nothing in the module produces.
 const CHECKOUT = `[MOD] checkout
@@ -168,4 +168,89 @@ Deno.test("renderStubsModule — boolean-only fields emit no counter", () => {
   const out = renderStubsModule([{ name: "ready", tsType: "boolean" }]);
   assertEquals(out.includes("counter"), false);
   assertStringIncludes(out, "dto.ready = true;");
+});
+
+// A producer whose OUTPUT is the plural collection (tableNames) of the field a
+// consumer needs ($tableName) — keep's contract resolves it, so no stub.
+const DISCOVER = `[MOD] catalog
+
+[ENT] http.discover(DiscoverDto): CatalogDto
+
+[DTO] DiscoverDto: realm
+    where to look
+[DTO] CatalogDto: tableName(s)
+    every discovered table
+
+[TYP:example=acme] realm: string
+    x
+[TYP] tableName: string
+    x`;
+
+const CONSUMER = `[MOD] writes
+
+[ENT] http.write(WriteDto): RowDto
+
+[DTO] WriteDto: tableName
+    a row to write
+[DTO] RowDto: rowId
+    the written row
+
+[TYP:ext] tableName: string
+    discovered elsewhere
+[TYP] rowId: string
+    x`;
+
+Deno.test("planStubs — a plural collection output fulfills the singular $input (no stub)", () => {
+  const fields = planStubs([
+    { path: "src/catalog/catalog.rune", text: DISCOVER },
+    { path: "src/writes/writes.rune", text: CONSUMER },
+  ]);
+  assertEquals(fields, []);
+});
+
+Deno.test("planStubs — without the plural producer the stub is still planned", () => {
+  const fields = planStubs([{ path: "src/writes/writes.rune", text: CONSUMER }]);
+  assertEquals(fields, [{ name: "tableName", tsType: "string" }]);
+});
+
+Deno.test("planInputDiagnostics — $input with no exact/plural producer names near-misses", () => {
+  // The producer outputs `tables` — NOT `tableName` or `tableNames` — a
+  // near-miss that silently fails the plural convention.
+  const nearMiss = DISCOVER.replace("tableName(s)", "table(s)").replace(
+    "[TYP] tableName: string",
+    "[TYP] table: string",
+  );
+  const notes = planInputDiagnostics([
+    { path: "src/catalog/catalog.rune", text: nearMiss },
+    { path: "src/writes/writes.rune", text: CONSUMER },
+  ]);
+  assertEquals(notes.length, 1);
+  assertEquals(notes[0].includes("$tableName"), true);
+  assertEquals(notes[0].includes("ghost stub"), true);
+});
+
+Deno.test("planInputDiagnostics — fulfilled by the plural producer → no notes", () => {
+  const notes = planInputDiagnostics([
+    { path: "src/catalog/catalog.rune", text: DISCOVER },
+    { path: "src/writes/writes.rune", text: CONSUMER },
+  ]);
+  assertEquals(notes, []);
+});
+
+Deno.test("planInputDiagnostics — unwired field with no example is a guaranteed-422 warning", () => {
+  // `realm` has no producer, no ext, no example.
+  const noExample = DISCOVER.replace("[TYP:example=acme] realm", "[TYP] realm");
+  const notes = planInputDiagnostics([
+    { path: "src/catalog/catalog.rune", text: noExample },
+  ]);
+  assertEquals(notes.length, 1);
+  assertEquals(notes[0].includes('field "realm"'), true);
+  assertEquals(notes[0].includes("guaranteed 422"), true);
+});
+
+Deno.test("planInputDiagnostics — an example silences the 422 warning", () => {
+  const notes = planInputDiagnostics([
+    { path: "src/catalog/catalog.rune", text: DISCOVER },
+  ]);
+  assertEquals(notes, []);
 });

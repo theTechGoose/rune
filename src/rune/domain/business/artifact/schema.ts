@@ -69,7 +69,7 @@ export const ModifierSchema = z.object({
   // ("min=0"). Optional so routing modifiers (core/ext) stay as they are.
   kind: z.string().optional(),
   decorator: z.string().optional(),
-  param: z.enum(["none", "number"]).optional(),
+  param: z.enum(["none", "number", "text"]).optional(),
 });
 
 export const BoundariesSchema = z.object({

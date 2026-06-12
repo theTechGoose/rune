@@ -7,6 +7,7 @@ import {
 import { loadArtifact } from "@rune/domain/business/artifact/mod.ts";
 import { isProjectSpec } from "@rune/domain/business/rune-bindings/mod.ts";
 import {
+  planInputDiagnostics,
   planStubs,
   renderStubsModule,
 } from "@rune/domain/business/rune-stubs/mod.ts";
@@ -34,6 +35,7 @@ interface SyncArgs {
   force: boolean;
   artifactPath: string | null;
   regen: string | null; // --regen <path>: regenerate just this file (non-destructively)
+  noRun: boolean; // --no-run: skip the run-all gate (red-by-default is the point)
 }
 
 function parseSyncArgs(args: string[]): SyncArgs | null {
@@ -43,17 +45,19 @@ function parseSyncArgs(args: string[]): SyncArgs | null {
   let force = false;
   let artifactPath: string | null = null;
   let regen: string | null = null;
+  let noRun = false;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--dry-run") dryRun = true;
     else if (a === "--force") force = true;
+    else if (a === "--no-run") noRun = true;
     else if (a === "--root") root = args[++i] ?? ".";
     else if (a === "--artifact") artifactPath = args[++i] ?? null;
     else if (a === "--regen") regen = args[++i] ?? null;
     else if (!a.startsWith("--") && runePath === null) runePath = a;
   }
   if (runePath === null) return null;
-  return { runePath, root, dryRun, force, artifactPath, regen };
+  return { runePath, root, dryRun, force, artifactPath, regen, noRun };
 }
 
 // Load the artifact's manifest options (bindings + codegen templates + policies)
@@ -104,7 +108,7 @@ export async function runSync(args: string[], written?: string[]): Promise<numbe
   const parsed = parseSyncArgs(args);
   if (!parsed) {
     console.error(
-      "Usage: rune sync <rune-file> [--root <dir>] [--artifact <keywords.json>] [--dry-run] [--force] [--regen <path>]",
+      "Usage: rune sync <rune-file> [--root <dir>] [--artifact <keywords.json>] [--dry-run] [--force] [--regen <path>] [--no-run]",
     );
     return 2;
   }
@@ -249,6 +253,12 @@ export async function runSync(args: string[], written?: string[]): Promise<numbe
     // survive re-syncs.
     const healNotes = await ensureHealRules(root, ioErrors, written);
     for (const n of healNotes) console.log(`\n  ${CYAN}${n}${RESET}`);
+
+    // Composition diagnostics: unproducible $inputs (plural-convention misses)
+    // and required fields nothing fills — the two shapes that turn the
+    // headless walk red. Printed every sync while they remain.
+    const inputNotes = planInputDiagnostics(await collectProjectSpecs(root));
+    for (const n of inputNotes) console.log(`\n  ${YELLOW}${n}${RESET}`);
   }
 
   report(
@@ -262,6 +272,14 @@ export async function runSync(args: string[], written?: string[]): Promise<numbe
     blocked,
     ioErrors,
   );
+
+  // The run-all gate: execute the composed app's walk and print the verdict
+  // LAST — "the map runs green" is the generation-time definition of done.
+  if (!parsed.dryRun) {
+    const gateLines = await runAllGate(root, parsed.noRun, written);
+    if (gateLines.length > 0) console.log("\n" + gateLines.join("\n"));
+  }
+
   return ioErrors.length > 0 ? 2 : 0;
 }
 
@@ -280,6 +298,10 @@ const REQUIRED_IMPORTS: Record<string, string> = {
   "@mrg-keystone/keep": "jsr:@mrg-keystone/keep@^1",
   // Generated coordinators validate their seams via keep's assert runtime.
   "#assert": "jsr:@mrg-keystone/keep@^1/assert",
+  // DTO [TYP:example=…] fields emit @ApiProperty({ example }) — the swagger
+  // decorator keep's runner/cake read example values from. Same range keep
+  // itself maps #danet/swagger to.
+  "#api-doc": "jsr:@danet/swagger@^2.1.1/decorators",
 };
 
 // Compiler options the generated code needs. class-validator / class-transformer
@@ -734,6 +756,194 @@ function healEnrichmentNote(dir: string, pending: string[]): string | null {
     `      remove \`todo: true\`. Schema: the keep skill's rules-file reference.`,
     `    A module is NOT done while todo:true entries remain.`,
   ].join("\n");
+}
+
+// ---- the run-all gate -------------------------------------------------------
+//
+// "Click Run all in the system view and it passes for anything I build."
+// After every real sync of a keep app, execute the composed app's walk —
+// keep's exerciseEndpoints, in-process, in a subprocess running the PROJECT's
+// module graph — and print the verdict as the last block of sync output. A
+// red walk names every failed step so the building session can't not notice
+// the app doesn't run. `--no-run` skips; red-by-default is the point.
+
+const GATE_MARKER = "__RUNE_RUN_ALL__";
+const GATE_SCRIPT = ".rune-run-all.ts";
+const GATE_TIMEOUT_MS = 120_000;
+
+/** One failed step of the walk (the subset of keep's EndpointResult we print). */
+interface GateFailure {
+  id: string;
+  module: string;
+  status?: number;
+  error?: string;
+  body?: unknown;
+}
+
+interface GateReport {
+  passed: { id: string }[];
+  failed: GateFailure[];
+  optionalFailed?: { id: string }[];
+  cycles: string[][];
+  iterations?: number;
+}
+
+// keep recognizes a fault slug in a failed body's `message`.
+const GATE_SLUG_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
+
+/** The headline failure text of a walk step: the response body's message
+ * (string or class-validator array), else the transport error, else status. */
+function gateFailureText(f: GateFailure): string {
+  const body = f.body as { message?: unknown } | undefined;
+  const m = body?.message;
+  if (typeof m === "string" && m) return m;
+  if (Array.isArray(m) && m.length) return m.map(String).join("; ");
+  if (f.error) return f.error;
+  return `status ${f.status ?? "?"}`;
+}
+
+/** Render the walk verdict. Pure — exported for tests. `heal` is the parsed
+ * project heal-rules file (null when absent) so slug failures can say whether
+ * a heal rule exists / is still an un-enriched scaffold. */
+export function formatRunAllVerdict(
+  report: GateReport,
+  heal: HealRules | null,
+): string[] {
+  const failed = report.failed ?? [];
+  const passed = report.passed ?? [];
+  const total = failed.length + passed.length;
+  const cycles = report.cycles ?? [];
+
+  if (failed.length === 0 && cycles.length === 0) {
+    return [
+      `  ${GREEN}run-all: ${total}/${total} steps passed — the composed app runs green.${RESET}`,
+    ];
+  }
+
+  const todo = new Set(heal ? todoSlugs(heal) : []);
+  const L: string[] = [
+    `  ${RED}${BOLD}run-all: ${failed.length}/${total} steps FAILED — the module is not done.${RESET}`,
+  ];
+  for (const f of failed) {
+    const text = gateFailureText(f);
+    let hint = "";
+    if (GATE_SLUG_RE.test(text)) {
+      const rules = heal?.slugs[text];
+      if (!rules || rules.length === 0) {
+        hint = " (no heal rule — enrich heal-rules.json)";
+      } else if (todo.has(text)) {
+        hint = " (heal rule un-enriched — enrich heal-rules.json)";
+      }
+    }
+    L.push(
+      `    ${RED}${f.module}:${f.id}  ${f.status ?? "?"} ${text}${hint}${RESET}`,
+    );
+  }
+  for (const c of cycles) {
+    L.push(`    ${RED}cycle: ${c.join(" → ")}${RESET}`);
+  }
+  L.push(
+    `    ${YELLOW}→ fix the spec/bindings until run-all is green, or enrich${RESET}`,
+    `    ${YELLOW}  fixtures/heal-rules.json where the failure is environmental.${RESET}`,
+  );
+  return L;
+}
+
+/** Execute the walk in a subprocess (the PROJECT's deno.json + module graph)
+ * and return the verdict lines. Soft on every failure mode — a missing deno,
+ * a compile error, a hang — the gate reports, it never throws or blocks the
+ * sync result. Returns [] when the project isn't a runnable keep app. */
+async function runAllGate(
+  root: string,
+  noRun: boolean,
+  written?: string[],
+): Promise<string[]> {
+  if (noRun) return [];
+  // Only a keep app with surfaces can walk.
+  if (await readMaybe(join(root, "bootstrap", "mod.ts")) === null) return [];
+  if ((await scanSurfaceModules(root)).length === 0) return [];
+
+  const script = join(root, GATE_SCRIPT);
+  const body = [
+    "// Written by rune sync for the run-all gate; deleted right after the run.",
+    'import { api } from "@/bootstrap/mod.ts";',
+    'import { exerciseEndpoints } from "@mrg-keystone/keep";',
+    "const report = await exerciseEndpoints({ api });",
+    "// deno-lint-ignore no-explicit-any",
+    "const slim = (r: any) => ({ id: r.id, module: r.module, status: r.status, error: r.error, body: r.body });",
+    `console.log(${JSON.stringify(GATE_MARKER)} + JSON.stringify({`,
+    "  passed: report.passed.map(slim),",
+    "  failed: report.failed.map(slim),",
+    "  optionalFailed: report.optionalFailed.map(slim),",
+    "  cycles: report.cycles,",
+    "  iterations: report.iterations,",
+    "}));",
+    "Deno.exit(0);",
+    "",
+  ].join("\n");
+
+  try {
+    await Deno.writeTextFile(script, body);
+    written?.push(script);
+  } catch (e) {
+    return [`  ${YELLOW}run-all: skipped (${errMessage(e)})${RESET}`];
+  }
+
+  try {
+    let out;
+    try {
+      out = await new Deno.Command("deno", {
+        args: ["run", "--quiet", "-A", GATE_SCRIPT],
+        cwd: root,
+        stdout: "piped",
+        stderr: "piped",
+        signal: AbortSignal.timeout(GATE_TIMEOUT_MS),
+      }).output();
+    } catch (e) {
+      // deno missing from PATH, or the timeout abort.
+      return [
+        `  ${YELLOW}run-all: could not execute the walk (${
+          errMessage(e)
+        }) — run it manually: deno run -A bootstrap/mod.ts then POST /docs/_run${RESET}`,
+      ];
+    }
+    const stdout = new TextDecoder().decode(out.stdout);
+    const marker = stdout.split("\n").find((l) => l.startsWith(GATE_MARKER));
+    if (!marker) {
+      // The app didn't boot (compile error, missing dep, throw at import).
+      const stderr = new TextDecoder().decode(out.stderr).trim()
+        .split("\n").slice(0, 6).join("\n    ");
+      return [
+        `  ${RED}${BOLD}run-all: the app failed to start — the module is not done.${RESET}`,
+        `    ${RED}${stderr || "(no error output)"}${RESET}`,
+        `    ${YELLOW}→ fix the build (deno check) until the app boots, then re-sync.${RESET}`,
+      ];
+    }
+    let report: GateReport;
+    try {
+      report = JSON.parse(marker.slice(GATE_MARKER.length));
+    } catch {
+      return [`  ${YELLOW}run-all: unreadable walk report — re-run manually.${RESET}`];
+    }
+    const heal = await loadProjectHealRules(root);
+    return formatRunAllVerdict(report, heal);
+  } finally {
+    try {
+      await Deno.remove(script);
+      written?.push(script);
+    } catch { /* already gone */ }
+  }
+}
+
+/** The project's heal-rules file, parsed leniently (null when absent/foreign). */
+async function loadProjectHealRules(root: string): Promise<HealRules | null> {
+  const raw = await readMaybe(join(root, fixturesDir(), "heal-rules.json"));
+  if (raw === null) return null;
+  try {
+    return readHealRules(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 
 /** Every project spec (specs/<n>.rune, src/<m>/spec.rune, src/<m>/<m>.rune)

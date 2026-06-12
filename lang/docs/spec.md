@@ -355,7 +355,7 @@ The LSP enforces these rules:
 messages):
 
 - Unknown modifier:
-  `[TYP] unknown modifier "<m>" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive)`
+  `[TYP] unknown modifier "<m>" (allowed: ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>)`
 - Constraint on the wrong base primitive:
   `[TYP] modifier "<m>" requires a <string|number> type, but "<name>" is <declaredType>`
 - Missing or non-numeric value on `min`/`max`:
@@ -426,8 +426,12 @@ decorator, and the generated coordinator asserts them at every seam.
 | `min=N`    | `number` | `@Min(N)`           | `@Min(N, { each: true })`              |
 | `max=N`    | `number` | `@Max(N)`           | `@Max(N, { each: true })`              |
 | `positive` | `number` | `@IsPositive()`     | `@IsPositive({ each: true })`          |
+| `example=V`| any      | `@ApiProperty({ example: V })` | `@ApiProperty({ example: [V] })` |
 
 - Modifiers are comma-separated in the single bracket slot; order is kept
+- `example=<value>` takes free text (no commas — the list splits on them) and
+  requires a non-empty value; it emits the swagger example keep's runner/cake
+  fill required, unbound input fields from. Typed by the declared primitive.
 - `ext` / `core` keep their semantics and compose with constraints
   (`[TYP:ext,uuid]` is both an external input and a UUID)
 - Only `min` / `max` take a value (`min=0`); the value must be numeric

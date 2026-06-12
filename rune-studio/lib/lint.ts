@@ -315,9 +315,10 @@ const CHECKERS = {
       min: { base: "number", takesValue: true },
       max: { base: "number", takesValue: true },
       positive: { base: "number", takesValue: false },
+      example: { base: null, takesValue: false, takesText: true },
     };
     const ALLOWED =
-      "ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive";
+      "ext, core, uuid, email, url, nonempty, int, min=<n>, max=<n>, positive, example=<value>";
     const out = [];
     const push = (i, message) =>
       out.push({
@@ -349,12 +350,16 @@ const CHECKERS = {
           push(i, `[TYP] unknown modifier "${id}" (allowed: ${ALLOWED})`);
           continue;
         }
-        if (value !== null && !spec.takesValue) {
+        if (value !== null && !spec.takesValue && !spec.takesText) {
           push(i, `[TYP] modifier "${id}" does not take a value`);
           continue;
         }
         if (spec.takesValue && (value === null || !/^-?\d+(\.\d+)?$/.test(value))) {
           push(i, `[TYP] modifier "${id}" requires a numeric value (e.g. min=0)`);
+          continue;
+        }
+        if (spec.takesText && (value === null || value === "")) {
+          push(i, `[TYP] modifier "${id}" requires a value (e.g. example=orders)`);
           continue;
         }
         if (spec.base !== null && declaredType !== spec.base) {
