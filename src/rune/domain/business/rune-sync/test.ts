@@ -50,7 +50,9 @@ Deno.test("planSync preserves existing files and prunes orphans", () => {
   const plan = planSync("specs/orders.rune", SPEC, existing);
 
   // cart is predicted → skipped (preserved), never pruned
-  assert(plan.toSkip.includes("src/orders/domain/business/cart/mod.ts"));
+  assert(
+    plan.toSkip.some((f) => f.path === "src/orders/domain/business/cart/mod.ts"),
+  );
   assert(!plan.toPrune.includes("src/orders/domain/business/cart"));
 
   // orphans pruned: folder-level for features, file-level for dto

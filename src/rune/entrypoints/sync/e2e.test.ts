@@ -160,6 +160,36 @@ Deno.test("sync collects written paths and is physically quiet on a no-change re
   }
 });
 
+Deno.test("sync --regen offers a .new sibling instead of clobbering a hand-edited file", async () => {
+  const root = await Deno.makeTempDir();
+  try {
+    const runePath = join(root, "orders.rune");
+    await Deno.writeTextFile(runePath, SPEC);
+    assertEquals(await runSync([runePath, "--root", root]), 0);
+
+    const moved = join(root, "src/orders/orders.rune");
+    const target = join(root, "src/orders/domain/business/cart/mod.ts");
+    const original = await Deno.readTextFile(target);
+    // Hand-edit the create-once file (a filled-in body).
+    await Deno.writeTextFile(target, original + "\n// HAND EDIT — keep me\n");
+
+    // Regen just that file: a .new appears with the clean content; the edit survives.
+    assertEquals(await runSync([moved, "--root", root, "--regen", target]), 0);
+    const dotNew = `${target}.new`;
+    assert((await Deno.stat(dotNew)).isFile, ".new sibling must be written");
+    assert(
+      (await Deno.readTextFile(target)).includes("HAND EDIT"),
+      "the hand-edited original must be preserved",
+    );
+    assert(
+      !(await Deno.readTextFile(dotNew)).includes("HAND EDIT"),
+      "the .new must carry the clean regenerated content",
+    );
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 // Every file's mtime under root, as a stable fingerprint of "nothing was touched".
 async function mtimes(root: string): Promise<string> {
   const out: string[] = [];

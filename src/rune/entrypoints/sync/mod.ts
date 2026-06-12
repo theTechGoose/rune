@@ -25,6 +25,7 @@ interface SyncArgs {
   dryRun: boolean;
   force: boolean;
   artifactPath: string | null;
+  regen: string | null; // --regen <path>: regenerate just this file (non-destructively)
 }
 
 function parseSyncArgs(args: string[]): SyncArgs | null {
@@ -33,16 +34,18 @@ function parseSyncArgs(args: string[]): SyncArgs | null {
   let dryRun = false;
   let force = false;
   let artifactPath: string | null = null;
+  let regen: string | null = null;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--dry-run") dryRun = true;
     else if (a === "--force") force = true;
     else if (a === "--root") root = args[++i] ?? ".";
     else if (a === "--artifact") artifactPath = args[++i] ?? null;
+    else if (a === "--regen") regen = args[++i] ?? null;
     else if (!a.startsWith("--") && runePath === null) runePath = a;
   }
   if (runePath === null) return null;
-  return { runePath, root, dryRun, force, artifactPath };
+  return { runePath, root, dryRun, force, artifactPath, regen };
 }
 
 // Load the artifact's manifest options (bindings + codegen templates + policies)
@@ -93,7 +96,7 @@ export async function runSync(args: string[], written?: string[]): Promise<numbe
   const parsed = parseSyncArgs(args);
   if (!parsed) {
     console.error(
-      "Usage: rune sync <rune-file> [--root <dir>] [--artifact <keywords.json>] [--dry-run] [--force]",
+      "Usage: rune sync <rune-file> [--root <dir>] [--artifact <keywords.json>] [--dry-run] [--force] [--regen <path>]",
     );
     return 2;
   }
@@ -128,6 +131,42 @@ export async function runSync(args: string[], written?: string[]): Promise<numbe
   const regenerated: string[] = [];
   const pruned: string[] = [];
   const ioErrors: string[] = [];
+
+  // --regen <path>: regenerate exactly one file. If it exists and differs, write a `.new` sibling
+  // (a hand-edited body is preserved for a manual merge); if it's absent, create it. This is the
+  // non-destructive way to pull a changed signature into an already-filled shell — no full sync,
+  // no prune.
+  if (parsed.regen) {
+    const relTarget = relative(root, resolve(parsed.regen));
+    const planned = [...plan.toCreate, ...plan.toRegenerate, ...plan.toSkip]
+      .find((f) => f.path === relTarget);
+    if (!planned) {
+      console.error(
+        `${RED}error: ${relTarget} is not a generated file of ${plan.module}${RESET}`,
+      );
+      return 2;
+    }
+    const abs = join(root, relTarget);
+    const existing = await readMaybe(abs);
+    if (existing === null) {
+      await write(root, relTarget, planned.content, ioErrors, written);
+      console.log(`  ${CYAN}created ${relTarget}${RESET}`);
+    } else if (existing === planned.content) {
+      console.log(
+        `  ${CYAN}${relTarget} already matches the spec — nothing to do${RESET}`,
+      );
+    } else {
+      const newRel = `${relTarget}.new`;
+      await write(root, newRel, planned.content, ioErrors, written);
+      console.log(
+        `  ${CYAN}wrote ${newRel} — diff it into ${relTarget}, then delete the .new${RESET}`,
+      );
+    }
+    if (ioErrors.length > 0) {
+      for (const e of ioErrors) console.error(`  ${RED}${e}${RESET}`);
+    }
+    return ioErrors.length > 0 ? 2 : 0;
+  }
 
   // Dev-owned orphans (hand-written bodies) are only deleted with --force; without
   // it they're held back so a spec edit can never silently drop your code.

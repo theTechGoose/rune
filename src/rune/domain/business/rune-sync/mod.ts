@@ -39,7 +39,7 @@ export interface SyncPlan {
    * entrypoint requires --force to delete these; spec-owned orphans (dto files)
    * prune without it. */
   toPruneOwned: string[];
-  toSkip: string[];
+  toSkip: FilePlan[];
   errors: string[];
 }
 

@@ -42,7 +42,9 @@ export interface ManifestPlan {
   toCreate: FilePlan[];
   // Spec-owned files (sig.ts) rewritten on every run, even if they already exist.
   toRegenerate: FilePlan[];
-  toSkip: string[];
+  // Create-once files that already exist (preserved). Carry their freshly-generated content so
+  // `rune sync --regen <path>` can offer it as a `.new` sibling without re-running the manifest.
+  toSkip: FilePlan[];
   errors: string[];
 }
 
@@ -186,6 +188,36 @@ export function planManifest(
       ast.typs.filter((t) => t.isExternal).map((t) => t.name),
     );
     const entProcess = computeEntProcess(ast.ents, dtoByName, externalTypes);
+    // Ambiguous ENT→[REQ] delegation: a [REQ] is chosen by its (input, output) DTO pair, so two
+    // [REQ]s with the SAME signature make the pick silent and type-correct-but-wrong. Reject it
+    // rather than first-wins — the spec must disambiguate.
+    for (const ent of ast.ents) {
+      if (ent.delegate) {
+        // Explicit delegation ([ENT] body [REQ]) resolves the pick — no ambiguity; just confirm
+        // the named [REQ] exists.
+        const found = ast.reqs.some((r) =>
+          r.noun === ent.delegate!.noun && r.verb === ent.delegate!.verb
+        );
+        if (!found) {
+          plan.errors.push(
+            `${runePath}: [ENT] ${ent.surface}.${ent.action} delegates to [REQ] ` +
+              `${ent.delegate.noun}.${ent.delegate.verb}, which is not defined`,
+          );
+        }
+        continue;
+      }
+      const matches = ast.reqs.filter(
+        (r) => r.input === ent.input && r.output === ent.output,
+      );
+      if (matches.length > 1) {
+        plan.errors.push(
+          `${runePath}: [ENT] ${ent.surface}.${ent.action}(${ent.input}): ${ent.output} is ` +
+            `ambiguous — ${matches.length} [REQ]s share that signature (${
+              matches.map((r) => `${r.noun}.${r.verb}`).join(", ")
+            }); give them distinct (input): output signatures so the delegation is unambiguous`,
+        );
+      }
+    }
     const bySurface = new Map<string, EntNode[]>();
     for (const ent of ast.ents) {
       const list = bySurface.get(ent.surface) ?? [];
@@ -200,7 +232,7 @@ export function planManifest(
 
   // Split into toCreate / toSkip based on existence; regenerate-lifecycle files always (re)write.
   for (const [path, content] of wantedFiles) {
-    if (existingFiles.has(path)) plan.toSkip.push(path);
+    if (existingFiles.has(path)) plan.toSkip.push({ path, content });
     else plan.toCreate.push({ path, content });
   }
   for (const [path, content] of regenFiles) {
@@ -209,7 +241,7 @@ export function planManifest(
   // Stable ordering for output.
   plan.toCreate.sort((a, b) => a.path.localeCompare(b.path));
   plan.toRegenerate.sort((a, b) => a.path.localeCompare(b.path));
-  plan.toSkip.sort();
+  plan.toSkip.sort((a, b) => a.path.localeCompare(b.path));
 
   return plan;
 }
@@ -769,9 +801,11 @@ function renderCoordinator(
   const outputSeam = seamFor(req.output, typMap);
   // Validated input replaces `input` everywhere downstream.
   const inputRef = inputSeam.kind === "opaque" ? "input" : "validInput";
+  // A whole-DTO param is the coordinator's own input DTO — pass the validated input that's
+  // already in scope (`validInput`, or `input` when there's no seam), not `undefined as never`.
   const stepArgs = (params: string[]): string =>
     params
-      .map((p) => /Dto$/.test(p) ? `undefined as never` : `${inputRef}.${p}`)
+      .map((p) => /Dto$/.test(p) ? inputRef : `${inputRef}.${p}`)
       .join(", ");
   const usesAssert = inputSeam.kind !== "opaque" ||
     outputSeam.kind !== "opaque" ||
@@ -946,20 +980,49 @@ function computeEntProcess(
   externalTypes: Set<string> = new Set(),
 ): Map<EntNode, EntProcess> {
   const out = new Map<EntNode, EntProcess>();
+  // dependsOn edges committed so far, keyed by action — lets us detect, in declaration order,
+  // when a new producer edge would close a cycle.
+  const depsByAction = new Map<string, Set<string>>();
+  const dependsOnReaches = (from: string, target: string): boolean => {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (cur === target) return true;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      for (const d of depsByAction.get(cur) ?? []) stack.push(d);
+    }
+    return false;
+  };
+  // What an ent genuinely MINTS: output fields that aren't echoes of its own input. An echoed
+  // field (in both the input and output DTO) is not a real source and must not be derived as a
+  // producer — that's what poisons the graph into cycles.
+  const minted = (e: EntNode): Set<string> => {
+    const outDto = dtoByName.get(e.output);
+    if (!outDto) return new Set();
+    const inDto = dtoByName.get(e.input);
+    const echoed = new Set(inDto ? dtoFieldNames(inDto) : []);
+    return new Set(dtoFieldNames(outDto).filter((f) => !echoed.has(f)));
+  };
   ents.forEach((ent, i) => {
     const inDto = dtoByName.get(ent.input);
     const inFields = inDto ? dtoFieldNames(inDto) : [];
     const dependsOn = new Set<string>();
     const bind: Record<string, string | string[]> = {};
     for (const field of inFields) {
-      // ents is in declaration order, so the first hit is the earliest producer.
-      const producers = ents.filter((p) => {
-        if (p === ent) return false;
-        const outDto = dtoByName.get(p.output);
-        return outDto ? dtoFieldNames(outDto).includes(field) : false;
-      });
+      // ents is in declaration order; a producer already (transitively) downstream of this ent is
+      // dropped — wiring it would create a cycle — so the earliest *acyclic* producer wins.
+      const producers = ents.filter((p) =>
+        p !== ent && minted(p).has(field) &&
+        !dependsOnReaches(p.action, ent.action)
+      );
       if (producers.length === 0) {
-        if (externalTypes.has(field)) bind[field] = `$${field}`;
+        // No acyclic producer. If some producer exists but every one would cycle, fall back to a
+        // `$field` external-input bind (the field is supplied by seeds / the Module-inputs card)
+        // rather than emitting a circular dependsOn; otherwise honor an explicit `ext` type.
+        const cyclicOnly = ents.some((p) => p !== ent && minted(p).has(field));
+        if (externalTypes.has(field) || cyclicOnly) bind[field] = `$${field}`;
         continue;
       }
       const flows = new Set(producers.map(entFlow).filter((f) => f !== null));
@@ -973,6 +1036,7 @@ function computeEntProcess(
         bind[field] = `${producer.action}.${field}`;
       }
     }
+    depsByAction.set(ent.action, new Set(dependsOn));
     const flow = entFlow(ent);
     out.set(ent, {
       order: i + 1,
@@ -1012,7 +1076,13 @@ function renderEntrypointController(
   const coordImports = new Set<string>();
   const entCoord = new Map<EntNode, string | null>();
   for (const ent of ents) {
-    const req = reqs.find((r) => r.input === ent.input && r.output === ent.output);
+    // An explicit `[ENT]` body `[REQ]` names the exact coordinator; otherwise fall back to the
+    // (input, output) signature match.
+    const req = ent.delegate
+      ? reqs.find((r) =>
+        r.noun === ent.delegate!.noun && r.verb === ent.delegate!.verb
+      )
+      : reqs.find((r) => r.input === ent.input && r.output === ent.output);
     if (!req) {
       entCoord.set(ent, null);
       continue;
@@ -1041,9 +1111,12 @@ function renderEntrypointController(
     const p = process.get(ent)!;
     // Each endpoint gets a distinct sub-path (the action) so methods on one surface
     // controller don't collide at the same route.
+    // An empty input (`({})`) has no request body — omit `input:` (emitting `input: {}` trips
+    // keep's Type constraint, TS2740) and generate a no-param handler below.
+    const noInput = ent.input === "{}";
     const opts = [
       `path: ${JSON.stringify(applyCase(ent.action, "kebab"))}`,
-      `input: ${ent.input}`,
+      ...(noInput ? [] : [`input: ${ent.input}`]),
       `output: ${ent.output}`,
       `order: ${p.order}`,
     ];
@@ -1056,10 +1129,14 @@ function renderEntrypointController(
     }
     if (p.optional) opts.push("optional: true");
     L.push(`  @Endpoint({ ${opts.join(", ")} })`);
-    L.push(`  ${ent.action}(body: ${ent.input}): Promise<${ent.output}> {`);
+    L.push(
+      `  ${ent.action}(${
+        noInput ? "" : `body: ${ent.input}`
+      }): Promise<${ent.output}> {`,
+    );
     const alias = entCoord.get(ent);
     if (alias) {
-      L.push(`    return ${alias}(body);`);
+      L.push(`    return ${alias}(${noInput ? "{}" : "body"});`);
     } else {
       L.push(`    // No [REQ] matches (${ent.input}): ${ent.output} — wire a coordinator.`);
       L.push(`    throw new Error("not implemented");`);
@@ -1281,6 +1358,13 @@ function resolvePath(ctx: Record<string, unknown>, path: string): unknown {
 const HEADER = `// Generated by rune manifest from {{runePath}}.
 // Edit the body. Re-running manifest will not overwrite this file.\n`;
 
+// Banner for spec-owned files that are regenerated in full every sync (so a pruned coordinator
+// can't leave a dead import behind) — the opposite contract from HEADER's "edit the body". No
+// {{runePath}} (unlike HEADER): a regenerated file must stay byte-identical across re-syncs even
+// after sync relocates the spec, so `rune dev`'s no-change loop touches nothing.
+const REGEN_HEADER =
+  `// Generated by rune manifest — DO NOT EDIT (regenerated on every \`rune sync\`).\n`;
+
 const COORDINATOR_INT_TEST_TPL = `${HEADER}
 import { {{req.verb}} } from "./mod.ts";
 
@@ -1350,7 +1434,7 @@ Deno.test("{{this}}", async () => {
 {{/each}}
 `;
 
-const MOD_ROOT_TPL = `${HEADER}
+const MOD_ROOT_TPL = `${REGEN_HEADER}
 // Public API surface for module "{{module}}".
 {{#each reqs}}
 ${"export"} { {{this.verb}} } from "./domain/coordinators/{{this.processFile}}/mod.ts";
@@ -1410,7 +1494,7 @@ export const DEFAULT_POLICIES: Record<string, TemplatePolicy> = {
   "typ": { lifecycle: "create-once", prunable: true },
   "entrypoint-mod": { lifecycle: "create-once", prunable: true },
   "entrypoint-e2e": { lifecycle: "create-once", prunable: true },
-  "mod-root": { lifecycle: "create-once", prunable: true },
+  "mod-root": { lifecycle: "regenerate", prunable: true },
 };
 
 // Policies active for the current planManifest call; null → engine defaults.

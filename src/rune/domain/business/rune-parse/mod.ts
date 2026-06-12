@@ -39,6 +39,12 @@ export interface EntNode {
    */
   modifier: string | null;
   line: number;
+  /**
+   * The [REQ] this ent dispatches to, captured from an indented `[REQ]` line in the ent body
+   * (`[ENT] http.x(A): B` then `    [REQ] noun.verb(A): B`). When set, codegen delegates to exactly
+   * this coordinator instead of guessing by the (input, output) signature.
+   */
+  delegate?: { noun: string; verb: string };
 }
 
 export type StepLike = StepNode | BoundaryStepNode | PlyNode | CtrNode | RetNode;
@@ -160,6 +166,7 @@ export function parse(text: string, opts: ParseOptions = {}): RuneAst {
   let currentPly: PlyNode | null = null;
   let currentCse: CseNode | null = null;
   let lastStep: StepNode | BoundaryStepNode | null = null;
+  let currentEnt: EntNode | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
@@ -177,6 +184,33 @@ export function parse(text: string, opts: ParseOptions = {}): RuneAst {
       // Blank line ends description blocks and current REQ scope for steps.
       descTarget = null;
       continue;
+    }
+
+    // An indented [REQ] directly under an [ENT] is that ENT's delegation target (the documented
+    // ent-body form) — capture it instead of letting it become a stepless shadow coordinator.
+    // Any other line ends the ent-body context.
+    if (currentEnt) {
+      const entReq = indent > 0 ? rec.match(trimmed, "req") : null;
+      if (entReq) {
+        const sig = parseReqSignature(entReq.rest);
+        if (!sig) {
+          ast.errors.push({
+            line: i,
+            message: "[ENT] body [REQ] has a malformed signature",
+          });
+        } else if (entReq.modifier !== null) {
+          ast.errors.push({
+            line: i,
+            message: "[ENT] body [REQ] does not take a modifier",
+          });
+        } else {
+          currentEnt.delegate = { noun: sig.noun, verb: sig.verb };
+        }
+        currentEnt = null;
+        descTarget = null;
+        continue;
+      }
+      currentEnt = null;
     }
 
     // Close [PLY]/[CSE] block when indentation drops back to step level (≤4)
@@ -238,14 +272,16 @@ export function parse(text: string, opts: ParseOptions = {}): RuneAst {
       if (!sig) {
         ast.errors.push({ line: i, message: "[ENT] missing or malformed signature" });
       } else {
-        ast.ents.push({
+        const entNode: EntNode = {
           surface: sig.noun,
           action: sig.verb,
           input: sig.input,
           output: sig.output,
           modifier: entTag.modifier,
           line: i,
-        });
+        };
+        ast.ents.push(entNode);
+        currentEnt = entNode; // an indented [REQ] on the next line becomes its delegate
       }
       currentReq = null;
       currentPly = null;

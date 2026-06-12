@@ -168,7 +168,7 @@ export async function runManifest(args: string[]): Promise<number> {
         created,
         regenerated,
         appended: [],
-        skipped: plan.toSkip,
+        skipped: plan.toSkip.map((f) => f.path),
         errors: ioErrors,
       },
       null,

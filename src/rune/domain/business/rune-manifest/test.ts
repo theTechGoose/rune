@@ -41,8 +41,11 @@ Deno.test("planManifest — coordinator + DTO + TYP for a simple rune", () => {
   assertEquals(paths.includes("src/recording/dto/in.ts"), true);
   // typ file
   assertEquals(paths.includes("src/recording/dto/id.ts"), true);
-  // mod-root
-  assertEquals(paths.includes("src/recording/mod-root.ts"), true);
+  // mod-root — regenerated every sync now (was create-once), so it lands in toRegenerate
+  assertEquals(
+    plan.toRegenerate.map((f) => f.path).includes("src/recording/mod-root.ts"),
+    true,
+  );
 });
 
 Deno.test("planManifest — boundary calls produce adapter folders", () => {
@@ -299,6 +302,126 @@ Deno.test("planManifest — [TYP:ext] seeds the generated e2e with a typed place
   assertStringIncludes(e2e.content, 'overrides: { seeds: { memberId: "memberId-stub" } }');
 });
 
+Deno.test("planManifest — bind derivation breaks a producer cycle with a $input fallback", () => {
+  // enable consumes `selected` (select mints it); select consumes `enabled` (enable mints it).
+  // Earliest-producer-wins keeps enable→select; the edge that would close the cycle (select→enable)
+  // is dropped and `enabled` falls back to a $input bind instead of a circular dependsOn.
+  const rune = `[MOD] meta
+
+[ENT] http.enable(EnableDto): EnabledDto
+[ENT] http.select(SelectDto): SelectedDto
+
+[DTO] EnableDto: selected
+    needs the selection
+[DTO] EnabledDto: enabled
+    the enabled flag
+[DTO] SelectDto: enabled
+    needs the enabled flag
+[DTO] SelectedDto: selected
+    the selection
+
+[TYP] selected: string
+    x
+[TYP] enabled: string
+    x`;
+  const plan = planManifest("specs/meta.rune", rune, new Set());
+  assertEquals(plan.errors, []);
+  const mod = plan.toCreate.find((f) =>
+    f.path === "src/meta/entrypoints/http/mod.ts"
+  );
+  if (!mod) throw new Error("no entrypoint mod.ts generated");
+  // The first consumer keeps its producer edge.
+  assertStringIncludes(
+    mod.content,
+    'dependsOn: ["select"], bind: {"selected":"select.selected"}',
+  );
+  // The cycle-closing edge is gone; select's field is supplied externally instead.
+  assertStringIncludes(mod.content, 'bind: {"enabled":"$enabled"}');
+  assertEquals(mod.content.includes('dependsOn: ["enable"]'), false);
+});
+
+Deno.test("planManifest — ({}) input omits @Endpoint input and makes a no-param handler", () => {
+  const rune = `[MOD] ticker
+
+[ENT] http.refresh({}): StatusDto
+
+[DTO] StatusDto: count
+    how many
+
+[TYP] count: number
+    x`;
+  const plan = planManifest("specs/ticker.rune", rune, new Set());
+  assertEquals(plan.errors, []);
+  const mod = plan.toCreate.find((f) =>
+    f.path === "src/ticker/entrypoints/http/mod.ts"
+  );
+  if (!mod) throw new Error("no entrypoint mod.ts generated");
+  // `input: {}` (TS2740) is gone and the handler takes no body.
+  assertEquals(mod.content.includes("input: {}"), false);
+  assertStringIncludes(mod.content, "refresh(): Promise<StatusDto>");
+});
+
+Deno.test("planManifest — ambiguous ENT→[REQ] delegation (same signature) is an error", () => {
+  // Two [REQ]s share (InDto): CatalogDto, so the ent's (input, output) match is ambiguous.
+  const rune = `[MOD] catalog
+
+[ENT] http.fetch(InDto): CatalogDto
+
+[REQ] catalog.list(InDto): CatalogDto
+    items::compute(x): items
+[REQ] catalog.discover(InDto): CatalogDto
+    items::compute(x): items
+
+[DTO] InDto: x
+    in
+[DTO] CatalogDto: items
+    out
+
+[TYP] x: string
+    a
+[TYP] items: string
+    b`;
+  const plan = planManifest("specs/catalog.rune", rune, new Set());
+  assertEquals(plan.errors.length > 0, true);
+  assertStringIncludes(plan.errors.join("\n"), "ambiguous");
+});
+
+Deno.test("planManifest — documented [ENT] body [REQ] delegates (no stepless shadow)", () => {
+  // The indented [REQ] is the ent's delegation target, NOT a second stepless coordinator.
+  const rune = `[MOD] recording
+
+[ENT] http.postRecording(GetRecordingDto): IdDto
+    [REQ] recording.set(GetRecordingDto): IdDto
+
+[REQ] recording.set(GetRecordingDto): IdDto
+    db:store.lookup(name): id
+
+[DTO] GetRecordingDto: name
+    in
+[DTO] IdDto: id
+    out
+
+[TYP] name: string
+    a
+[TYP] id: string
+    b`;
+  const plan = planManifest("specs/recording.rune", rune, new Set());
+  // No shadow REQ, so no ambiguity error and codegen succeeds.
+  assertEquals(plan.errors, []);
+  const mod = plan.toCreate.find((f) =>
+    f.path === "src/recording/entrypoints/http/mod.ts"
+  );
+  if (!mod) throw new Error("no entrypoint mod.ts generated");
+  // The ent delegates to the named coordinator.
+  assertStringIncludes(mod.content, "return recordingSet(body)");
+  // And the generated coordinator is the REAL block (has its reads), not an empty shadow.
+  const coord = plan.toCreate.find((f) =>
+    f.path === "src/recording/domain/coordinators/recording-set/mod.ts"
+  );
+  if (!coord) throw new Error("no coordinator generated");
+  assertStringIncludes(coord.content, "// reads");
+});
+
 Deno.test("planManifest — number-typed [TYP:ext] seeds a numeric placeholder", () => {
   const rune = `[MOD] billing
 
@@ -373,13 +496,15 @@ Deno.test("planManifest — idempotent: existing files go to toSkip", () => {
   ]);
   const plan = planManifest("specs/recording.rune", rune, existing);
   assertEquals(
-    plan.toSkip.includes(
-      "src/recording/domain/coordinators/recording-set/mod.ts",
+    plan.toSkip.some((f) =>
+      f.path === "src/recording/domain/coordinators/recording-set/mod.ts"
     ),
     true,
   );
   assertEquals(
-    plan.toSkip.includes("src/recording/domain/business/id/mod.ts"),
+    plan.toSkip.some((f) =>
+      f.path === "src/recording/domain/business/id/mod.ts"
+    ),
     true,
   );
   // Other files still go to toCreate
@@ -531,7 +656,7 @@ Deno.test("planManifest — mod-root re-exports each REQ verb", () => {
 [REQ] recording.get(InDto): OutDto
     id::create(name): id`;
   const plan = planManifest("specs/recording.rune", rune, new Set());
-  const modRoot = plan.toCreate.find((f) =>
+  const modRoot = plan.toRegenerate.find((f) =>
     f.path === "src/recording/mod-root.ts"
   );
   assertEquals(modRoot !== undefined, true);
